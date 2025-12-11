@@ -443,20 +443,34 @@ const InventoryView: React.FC<InventoryViewProps> = ({
 };
 
 // --- EXTRACTED COMPONENT: StaffView ---
+// Enhanced to support adding staff correctly and managing status/payroll
 const StaffView = () => {
-  const [staff, setStaff] = useState<StaffMember[]>([
-    { id: 'S1', name: 'Rahul Kumar', role: 'Head Chef', bu: BusinessUnit.DHABA, phone: '9876543210', salary: 25000, salaryPaid: 25000, status: 'Active', attendance: 26, joinDate: '2023-01-15' },
-    { id: 'S2', name: 'Amit Singh', role: 'Waiter', bu: BusinessUnit.DHABA, phone: '9876543211', salary: 12000, salaryPaid: 0, status: 'Active', attendance: 24, joinDate: '2023-03-10' },
+  // Extending StaffMember type locally to include department if not in global types
+  interface ExtendedStaffMember extends StaffMember {
+      department: string;
+  }
+
+  const [staff, setStaff] = useState<ExtendedStaffMember[]>([
+    { id: 'S1', name: 'Rahul Kumar', role: 'Head Chef', department: 'Kitchen', bu: BusinessUnit.DHABA, phone: '9876543210', salary: 25000, salaryPaid: 25000, status: 'Active', attendance: 26, joinDate: '2023-01-15' },
+    { id: 'S2', name: 'Amit Singh', role: 'Waiter', department: 'Service', bu: BusinessUnit.DHABA, phone: '9876543211', salary: 12000, salaryPaid: 0, status: 'Active', attendance: 24, joinDate: '2023-03-10' },
   ]);
   
-  const [showPayModal, setShowPayModal] = useState<StaffMember | null>(null);
+  const [showPayModal, setShowPayModal] = useState<ExtendedStaffMember | null>(null);
   const [payAmount, setPayAmount] = useState('');
+  
   const [showAddModal, setShowAddModal] = useState(false);
   const [newStaff, setNewStaff] = useState({ name: '', role: 'Waiter', phone: '', salary: '', dept: 'Service' });
+  const [showSyncToast, setShowSyncToast] = useState(false);
 
   const totalPayroll = staff.reduce((acc, s) => acc + s.salary, 0);
   const paidAmount = staff.reduce((acc, s) => acc + s.salaryPaid, 0);
   const pending = totalPayroll - paidAmount;
+
+  // Simulate syncing to super admin
+  const triggerSync = () => {
+      setShowSyncToast(true);
+      setTimeout(() => setShowSyncToast(false), 3000);
+  };
 
   const toggleStatus = (id: string) => {
     setStaff(prev => prev.map(s => {
@@ -469,6 +483,7 @@ const StaffView = () => {
       }
       return s;
     }));
+    triggerSync();
   };
 
   const handlePay = () => {
@@ -477,16 +492,18 @@ const StaffView = () => {
     setStaff(prev => prev.map(s => s.id === showPayModal.id ? {...s, salaryPaid: s.salaryPaid + amt} : s));
     setShowPayModal(null);
     setPayAmount('');
-    alert(`Paid ₹${amt} to ${showPayModal.name}`);
+    triggerSync();
   };
 
   const handleAddStaff = () => {
     if(!newStaff.name || !newStaff.salary) return;
-    const newMember: StaffMember = {
+    
+    const newMember: ExtendedStaffMember = {
         id: Math.random().toString(36).substr(2,9),
         name: newStaff.name,
         role: newStaff.role,
-        bu: BusinessUnit.DHABA, // Default to current unit context
+        department: newStaff.dept,
+        bu: BusinessUnit.DHABA, 
         phone: newStaff.phone || '-',
         salary: parseInt(newStaff.salary),
         salaryPaid: 0,
@@ -494,12 +511,14 @@ const StaffView = () => {
         attendance: 0,
         joinDate: new Date().toISOString().split('T')[0]
     };
+    
     setStaff(prev => [newMember, ...prev]);
     setShowAddModal(false);
     setNewStaff({ name: '', role: 'Waiter', phone: '', salary: '', dept: 'Service' });
+    triggerSync();
   };
 
-  const statusColors = {
+  const statusColors: Record<string, string> = {
       'Active': 'bg-green-100 text-green-700 border-green-200',
       'On Leave': 'bg-yellow-100 text-yellow-700 border-yellow-200',
       'Terminated': 'bg-red-100 text-red-700 border-red-200',
@@ -507,6 +526,14 @@ const StaffView = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in">
+       {/* Sync Toast */}
+       {showSyncToast && (
+           <div className="fixed top-24 right-4 z-50 bg-slate-800 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 animate-in slide-in-from-right fade-in">
+               <Icons.Refresh className="w-4 h-4 animate-spin" />
+               <span className="text-sm font-medium">Syncing updates to Super Admin...</span>
+           </div>
+       )}
+
        {/* Summary Header */}
        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
@@ -558,9 +585,9 @@ const StaffView = () => {
                    </div>
                    <div>
                       <p className="font-bold text-slate-900 text-lg leading-none mb-1">{s.name}</p>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
                           <span className="inline-block bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">{s.role}</span>
-                          <span className="inline-block bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">{s.bu}</span>
+                          <span className="inline-block bg-blue-50 text-blue-600 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">{s.department}</span>
                       </div>
                       <p className="text-xs text-slate-400 mt-1">{s.phone}</p>
                    </div>
@@ -584,8 +611,9 @@ const StaffView = () => {
                 <div className="flex gap-3 w-full md:w-auto">
                     <button 
                         onClick={() => toggleStatus(s.id)}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all flex-1 md:flex-none flex items-center justify-center gap-2 ${statusColors[s.status as keyof typeof statusColors]}`}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all flex-1 md:flex-none flex items-center justify-center gap-2 ${statusColors[s.status] || statusColors['Active']}`}
                     >
+                        <div className={`w-2 h-2 rounded-full ${s.status === 'Active' ? 'bg-green-600 animate-pulse' : 'bg-slate-400'}`} />
                         {s.status}
                     </button>
                     <Button 
