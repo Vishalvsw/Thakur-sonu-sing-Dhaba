@@ -1,0 +1,8 @@
+{
+  "name": "Thakur's Grandpoint",
+  "description": "Premium hospitality management suite for Dhaba, Rooms, Snooker, and Bar with low-literacy accessibility tools.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
