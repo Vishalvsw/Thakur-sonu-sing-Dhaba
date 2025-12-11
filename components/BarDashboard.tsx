@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react';
 import { Icons } from './IconSet';
 import { Button } from './Components';
 import { BusinessUnit, Order, Product, CartItem, PaymentMethod, OrderStatus } from '../types';
+import { parseVoiceOrder } from '../services/geminiService';
 
 // --- Types specific to Bar ---
 type PourSize = '30ml' | '60ml' | '90ml' | 'Btl';
@@ -128,6 +129,28 @@ const StockModal = ({ product, onClose, onConfirm }: { product: Product, onClose
   );
 };
 
+const SuccessOverlay = () => (
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="bg-slate-900 p-10 rounded-[2rem] border border-emerald-500/30 shadow-2xl shadow-emerald-500/20 flex flex-col items-center animate-in zoom-in-95 slide-in-from-bottom-4 duration-300 transform scale-100">
+         <div className="w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-emerald-500/50 animate-[bounce_1s_infinite]">
+            <Icons.Check className="w-12 h-12 text-slate-900 stroke-[4]" />
+         </div>
+         <h2 className="text-4xl font-black text-white mb-2 tracking-tight">Payment Success!</h2>
+         <p className="text-slate-400 text-lg font-medium mb-6">Transaction Recorded.</p>
+         
+         <div className="flex items-center gap-3 bg-slate-800/80 px-6 py-3 rounded-xl border border-slate-700/50">
+            <div className="bg-emerald-500/20 p-1.5 rounded-full">
+                <Icons.CheckCircle className="w-5 h-5 text-emerald-500" />
+            </div>
+            <div className="text-left">
+                <p className="text-emerald-400 font-bold text-sm leading-none">Stock Updated</p>
+                <p className="text-slate-500 text-xs font-medium">Inventory deducted automatically</p>
+            </div>
+         </div>
+      </div>
+    </div>
+);
+
 interface ShiftRecord {
     id: string;
     date: string;
@@ -143,6 +166,7 @@ export const BarDashboard: React.FC<BarDashboardProps> = ({ menu, orders, onPlac
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showPinModal, setShowPinModal] = useState<{ action: string, data?: any } | null>(null);
   const [stockUpdatedToast, setStockUpdatedToast] = useState(false);
+  const [orderSuccess, setOrderSuccess] = useState(false);
   
   // Stock Modal State
   const [stockModalProduct, setStockModalProduct] = useState<Product | null>(null);
@@ -158,6 +182,7 @@ export const BarDashboard: React.FC<BarDashboardProps> = ({ menu, orders, onPlac
 
   // Voice State
   const [isListening, setIsListening] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState('');
 
   // Filter only Bar items
   const barItems = menu.filter(p => p.bu === BusinessUnit.BAR);
@@ -196,16 +221,16 @@ export const BarDashboard: React.FC<BarDashboardProps> = ({ menu, orders, onPlac
     }
   };
 
-  const addToCart = (product: Product, size: PourSize) => {
+  const addToCart = (product: Product, size: PourSize, qty: number = 1) => {
     const price = getPrice(product, size);
     const id = `${product.id}-${size}`;
     
     setCart(prev => {
       const existing = prev.find(i => i.id === id);
       if (existing) {
-        return prev.map(i => i.id === id ? { ...i, quantity: i.quantity + 1 } : i);
+        return prev.map(i => i.id === id ? { ...i, quantity: i.quantity + qty } : i);
       }
-      return [...prev, { ...product, id, price, quantity: 1, variant: size }];
+      return [...prev, { ...product, id, price, quantity: qty, variant: size }];
     });
     // Haptic feedback if available
     if (navigator.vibrate) navigator.vibrate(50);
@@ -213,6 +238,69 @@ export const BarDashboard: React.FC<BarDashboardProps> = ({ menu, orders, onPlac
 
   const removeFromCart = (itemId: string) => {
     setCart(prev => prev.filter(i => i.id !== itemId));
+  };
+
+  const handleVoiceCommand = () => {
+    // Check for browser support
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert("Voice features are not supported in this browser. Please use Chrome, Edge, or Safari.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US'; 
+    recognition.continuous = false; 
+    recognition.interimResults = false;
+
+    setIsListening(true);
+    setVoiceTranscript('Listening...');
+
+    recognition.onresult = async (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setVoiceTranscript(`Thinking: "${transcript}"`);
+      
+      try {
+        const parsedItems = await parseVoiceOrder(transcript, barItems);
+        
+        if (parsedItems.length > 0) {
+          let addedNames: string[] = [];
+          parsedItems.forEach(pi => {
+            const product = barItems.find(p => p.id === pi.id);
+            if (product) {
+              // Default to 'Btl' for Beer, '30ml' for others for voice commands
+              let size: PourSize = '30ml';
+              if (product.subCategory === 'Beer') size = 'Btl';
+              
+              addToCart(product, size, pi.quantity);
+              addedNames.push(`${product.name} (${size})`);
+            }
+          });
+          setVoiceTranscript(`Added: ${addedNames.join(', ')}`);
+        } else {
+          setVoiceTranscript("Could not find item");
+        }
+      } catch (e) {
+        console.error(e);
+        setVoiceTranscript("Error");
+      }
+      setIsListening(false);
+      setTimeout(() => setVoiceTranscript(''), 3000);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech Recognition Error", event.error);
+      setVoiceTranscript("Could not hear");
+      setIsListening(false);
+      setTimeout(() => setVoiceTranscript(''), 3000);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognition.start();
   };
 
   // Helper to finalize shift
@@ -272,9 +360,9 @@ export const BarDashboard: React.FC<BarDashboardProps> = ({ menu, orders, onPlac
     });
     onUpdateMenu(updatedMenu);
 
-    // Show Stock Feedback
-    setStockUpdatedToast(true);
-    setTimeout(() => setStockUpdatedToast(false), 3000);
+    // Show Success Popup (Flash Message)
+    setOrderSuccess(true);
+    setTimeout(() => setOrderSuccess(false), 2500);
 
     // --- 2. Add to History ---
     const newOrder: Order = {
@@ -469,10 +557,21 @@ export const BarDashboard: React.FC<BarDashboardProps> = ({ menu, orders, onPlac
                    className="w-full bg-slate-900 text-white pl-12 pr-4 py-3.5 rounded-2xl border border-slate-800 focus:border-orange-500 focus:bg-slate-800 outline-none font-medium transition-all"
                  />
               </div>
-              <button className="bg-slate-900 border border-slate-800 hover:border-orange-500/50 text-orange-500 w-14 rounded-2xl flex items-center justify-center transition-all">
+              <button 
+                onClick={handleVoiceCommand}
+                className={`bg-slate-900 border border-slate-800 hover:border-orange-500/50 w-14 rounded-2xl flex items-center justify-center transition-all ${isListening ? 'text-red-500 border-red-500 animate-pulse' : 'text-orange-500'}`}
+              >
                  <Icons.Mic className="w-6 h-6" />
               </button>
            </div>
+
+           {/* Voice Transcript Overlay */}
+           {voiceTranscript && (
+             <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white px-6 py-2 rounded-full backdrop-blur z-30 shadow-xl flex items-center gap-3 border border-slate-700 animate-in fade-in zoom-in-95">
+                <Icons.Mic className="w-4 h-4 text-orange-400" />
+                <span className="font-medium text-sm whitespace-nowrap">{voiceTranscript}</span>
+             </div>
+           )}
 
            {/* Category Pills */}
            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
@@ -883,8 +982,11 @@ export const BarDashboard: React.FC<BarDashboardProps> = ({ menu, orders, onPlac
       </div>
       <MobileNav />
 
-      {/* Stock Updated Toast */}
-      {stockUpdatedToast && (
+      {/* Success Flash Message (Payment & Stock) */}
+      {orderSuccess && <SuccessOverlay />}
+
+      {/* Stock Updated Toast (Small backup if needed, but Overlay covers it now) */}
+      {stockUpdatedToast && !orderSuccess && (
           <div className="fixed top-24 right-8 bg-emerald-600 text-white px-6 py-3 rounded-xl shadow-2xl font-bold animate-in slide-in-from-right fade-in duration-300 z-[100] flex items-center gap-2">
               <Icons.CheckCircle className="w-5 h-5" />
               Stock Auto-Deducted
