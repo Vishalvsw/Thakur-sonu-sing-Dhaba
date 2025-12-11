@@ -437,6 +437,10 @@ const StaffTab = () => {
   const [staff, setStaff] = useState<StaffMember[]>(INITIAL_STAFF);
   const [showPayModal, setShowPayModal] = useState<StaffMember | null>(null);
   const [payAmount, setPayAmount] = useState('');
+  
+  // Add Staff State
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newStaff, setNewStaff] = useState({ name: '', role: 'Staff', bu: BusinessUnit.DHABA, phone: '', salary: '' });
 
   const totalPayroll = staff.reduce((acc, s) => acc + s.salary, 0);
   const paidThisMonth = staff.reduce((acc, s) => acc + s.salaryPaid, 0);
@@ -455,6 +459,25 @@ const StaffTab = () => {
     alert(`Payment of ₹${amount} recorded for ${showPayModal.name}`);
   };
 
+  const handleAddStaff = () => {
+      if (!newStaff.name || !newStaff.salary) return;
+      const newMember: StaffMember = {
+          id: Math.random().toString(36).substr(2, 9),
+          name: newStaff.name,
+          role: newStaff.role,
+          bu: newStaff.bu as BusinessUnit,
+          phone: newStaff.phone || '-',
+          salary: parseInt(newStaff.salary),
+          salaryPaid: 0,
+          status: 'Active',
+          attendance: 0,
+          joinDate: new Date().toISOString().split('T')[0]
+      };
+      setStaff(prev => [newMember, ...prev]);
+      setShowAddModal(false);
+      setNewStaff({ name: '', role: 'Staff', bu: BusinessUnit.DHABA, phone: '', salary: '' });
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -467,7 +490,7 @@ const StaffTab = () => {
        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-slate-100 flex justify-between items-center">
              <h3 className="font-bold text-slate-800 text-lg">Staff Directory & Salary</h3>
-             <Button size="sm" icon={<Icons.Plus className="w-4 h-4"/>}>Add Staff</Button>
+             <Button size="sm" icon={<Icons.Plus className="w-4 h-4"/>} onClick={() => setShowAddModal(true)}>Add Staff</Button>
           </div>
           <div className="overflow-x-auto">
              <table className="w-full text-left">
@@ -484,7 +507,7 @@ const StaffTab = () => {
                 <tbody className="divide-y divide-slate-100 text-sm">
                    {staff.map(s => {
                       const isPaid = s.salaryPaid >= s.salary;
-                      const progress = (s.salaryPaid / s.salary) * 100;
+                      const progress = s.salary > 0 ? (s.salaryPaid / s.salary) * 100 : 0;
                       return (
                         <tr key={s.id} className="hover:bg-slate-50 transition-colors">
                            <td className="p-4">
@@ -569,12 +592,80 @@ const StaffTab = () => {
              </div>
           </div>
        )}
+
+       {/* Add Staff Modal */}
+       {showAddModal && (
+          <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+             <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+                <h3 className="text-xl font-bold mb-4">Add New Staff</h3>
+                
+                <div className="space-y-3 mb-6">
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Full Name</label>
+                        <input 
+                            value={newStaff.name} 
+                            onChange={e => setNewStaff({...newStaff, name: e.target.value})} 
+                            className="w-full p-3 border border-slate-200 rounded-xl mt-1 outline-none focus:border-slate-800" 
+                            placeholder="e.g. John Doe"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Mobile Number</label>
+                        <input 
+                            value={newStaff.phone} 
+                            onChange={e => setNewStaff({...newStaff, phone: e.target.value})} 
+                            className="w-full p-3 border border-slate-200 rounded-xl mt-1 outline-none focus:border-slate-800" 
+                            placeholder="+91..."
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase">Role</label>
+                            <input 
+                                value={newStaff.role} 
+                                onChange={e => setNewStaff({...newStaff, role: e.target.value})} 
+                                className="w-full p-3 border border-slate-200 rounded-xl mt-1 outline-none focus:border-slate-800" 
+                                placeholder="Role"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase">Unit</label>
+                            <select 
+                                value={newStaff.bu} 
+                                onChange={e => setNewStaff({...newStaff, bu: e.target.value as BusinessUnit})} 
+                                className="w-full p-3 border border-slate-200 rounded-xl mt-1 outline-none focus:border-slate-800 bg-white"
+                            >
+                                <option value={BusinessUnit.DHABA}>Dhaba</option>
+                                <option value={BusinessUnit.BAR}>Bar</option>
+                                <option value={BusinessUnit.ROOMS}>Rooms</option>
+                                <option value={BusinessUnit.SNOOKER}>Snooker</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 uppercase">Monthly Salary</label>
+                        <input 
+                            type="number"
+                            value={newStaff.salary} 
+                            onChange={e => setNewStaff({...newStaff, salary: e.target.value})} 
+                            className="w-full p-3 border border-slate-200 rounded-xl mt-1 outline-none focus:border-slate-800" 
+                            placeholder="₹"
+                        />
+                    </div>
+                </div>
+
+                <div className="flex gap-3">
+                   <Button variant="secondary" fullWidth onClick={() => setShowAddModal(false)}>Cancel</Button>
+                   <Button fullWidth onClick={handleAddStaff} disabled={!newStaff.name || !newStaff.salary}>Add Staff</Button>
+                </div>
+             </div>
+          </div>
+       )}
     </div>
   );
 };
 
-// --- MAIN COMPONENT ---
-
+// ... (Rest of SuperAdminDashboard, e.g. Main Component export)
 export const SuperAdminDashboard = ({ onExit }: { onExit: () => void }) => {
   const [activeTab, setActiveTab] = useState<'HOME' | 'DHABA' | 'BAR' | 'SNOOKER' | 'LODGE' | 'STAFF'>('HOME');
 

@@ -1,16 +1,127 @@
 
+// ... (Imports stay the same)
 import React, { useState, useMemo, useEffect } from 'react';
 import { Icons } from './IconSet';
 import { Button } from './Components';
-import { BusinessUnit, Product } from '../types';
+import { BusinessUnit, Product, StaffMember } from '../types';
 
 interface RoomsDashboardProps {
   menu: Product[];
   onUpdateMenu: (newMenu: Product[]) => void;
 }
 
+// Extracted Staff View specific to Rooms
+const RoomsStaffView = () => {
+    const [staff, setStaff] = useState<StaffMember[]>([
+        { id: 'R1', name: 'Suresh', role: 'Cleaner', bu: BusinessUnit.ROOMS, phone: '9876543213', salary: 12000, salaryPaid: 0, status: 'Active', attendance: 28, joinDate: '2023-05-20' },
+        { id: 'R2', name: 'Ramesh', role: 'Receptionist', bu: BusinessUnit.ROOMS, phone: '9876543214', salary: 18000, salaryPaid: 18000, status: 'Active', attendance: 29, joinDate: '2023-01-10' },
+    ]);
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [newStaff, setNewStaff] = useState({ name: '', role: 'Cleaner', phone: '', salary: '' });
+    const [showPayModal, setShowPayModal] = useState<StaffMember | null>(null);
+    const [payAmount, setPayAmount] = useState('');
+
+    const handleAddStaff = () => {
+        if (!newStaff.name || !newStaff.salary) return;
+        setStaff(prev => [...prev, {
+            id: Math.random().toString(36).substr(2, 5),
+            name: newStaff.name,
+            role: newStaff.role,
+            bu: BusinessUnit.ROOMS,
+            phone: newStaff.phone,
+            salary: Number(newStaff.salary),
+            salaryPaid: 0,
+            status: 'Active',
+            attendance: 0,
+            joinDate: new Date().toISOString().split('T')[0]
+        }]);
+        setShowAddModal(false);
+    };
+
+    const handlePay = () => {
+        if (!showPayModal || !payAmount) return;
+        const amt = Number(payAmount);
+        setStaff(prev => prev.map(s => s.id === showPayModal.id ? {...s, salaryPaid: s.salaryPaid + amt} : s));
+        setShowPayModal(null);
+        setPayAmount('');
+    };
+
+    const toggleStatus = (id: string) => {
+        setStaff(prev => prev.map(s => s.id === id ? { ...s, status: s.status === 'Active' ? 'On Leave' : 'Active' } : s));
+    };
+
+    return (
+        <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 animate-in fade-in">
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-slate-800">Room Service Team</h2>
+                <Button onClick={() => setShowAddModal(true)} bu={BusinessUnit.ROOMS} icon={<Icons.Plus className="w-4 h-4"/>}>Add Staff</Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {staff.map(s => (
+                    <div key={s.id} className="bg-white p-6 rounded-2xl shadow-sm border border-purple-100 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-purple-100 text-purple-700 rounded-full flex items-center justify-center font-bold text-xl">{s.name[0]}</div>
+                            <div>
+                                <h3 className="font-bold text-slate-900">{s.name}</h3>
+                                <p className="text-xs text-slate-500 uppercase">{s.role}</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-xs font-bold text-slate-400">Salary Paid</p>
+                            <p className={`font-bold ${s.salaryPaid >= s.salary ? 'text-green-600' : 'text-orange-500'}`}>₹{s.salaryPaid} / ₹{s.salary}</p>
+                            <div className="flex gap-2 mt-2 justify-end">
+                                <button onClick={() => toggleStatus(s.id)} className={`text-[10px] font-bold px-2 py-1 rounded ${s.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{s.status}</button>
+                                <button onClick={() => setShowPayModal(s)} disabled={s.salaryPaid >= s.salary} className="text-[10px] font-bold px-2 py-1 rounded bg-slate-900 text-white disabled:opacity-50">Pay</button>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* Modals */}
+            {showAddModal && (
+                <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4">
+                    <div className="bg-white p-6 rounded-2xl w-full max-w-sm">
+                        <h3 className="text-xl font-bold mb-4">Add Cleaner/Staff</h3>
+                        <div className="space-y-3 mb-6">
+                            <input value={newStaff.name} onChange={e => setNewStaff({...newStaff, name: e.target.value})} className="w-full p-3 border rounded-xl" placeholder="Name" />
+                            <select value={newStaff.role} onChange={e => setNewStaff({...newStaff, role: e.target.value})} className="w-full p-3 border rounded-xl">
+                                <option>Cleaner</option>
+                                <option>Receptionist</option>
+                                <option>Maintenance</option>
+                            </select>
+                            <input value={newStaff.phone} onChange={e => setNewStaff({...newStaff, phone: e.target.value})} className="w-full p-3 border rounded-xl" placeholder="Phone" />
+                            <input type="number" value={newStaff.salary} onChange={e => setNewStaff({...newStaff, salary: e.target.value})} className="w-full p-3 border rounded-xl" placeholder="Salary" />
+                        </div>
+                        <div className="flex gap-2">
+                            <Button variant="secondary" fullWidth onClick={() => setShowAddModal(false)}>Cancel</Button>
+                            <Button fullWidth onClick={handleAddStaff} bu={BusinessUnit.ROOMS}>Add</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showPayModal && (
+                <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4">
+                    <div className="bg-white p-6 rounded-2xl w-full max-w-sm">
+                        <h3 className="text-xl font-bold mb-4">Pay Salary</h3>
+                        <p className="text-sm text-gray-500 mb-4">Paying {showPayModal.name}. Due: ₹{showPayModal.salary - showPayModal.salaryPaid}</p>
+                        <input type="number" value={payAmount} onChange={e => setPayAmount(e.target.value)} className="w-full p-4 border-2 border-purple-200 rounded-xl text-2xl font-bold mb-6 outline-none focus:border-purple-600" placeholder="0" autoFocus />
+                        <div className="flex gap-2">
+                            <Button variant="secondary" fullWidth onClick={() => setShowPayModal(null)}>Cancel</Button>
+                            <Button fullWidth onClick={handlePay} bu={BusinessUnit.ROOMS}>Confirm</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 export const RoomsDashboard: React.FC<RoomsDashboardProps> = ({ menu, onUpdateMenu }) => {
   // --- State ---
+  const [view, setView] = useState<'ROOMS' | 'STAFF'>('ROOMS');
   const [filter, setFilter] = useState<'ALL' | 'AVAILABLE' | 'ENGAGED'>('ALL');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState<Product | null>(null);
@@ -128,8 +239,8 @@ export const RoomsDashboard: React.FC<RoomsDashboardProps> = ({ menu, onUpdateMe
       setTimeout(() => setToastMsg(null), 3000);
   };
 
-  // --- Sub-Components ---
-
+  // --- Sub-Components (Keep existing AddRoomModal, DeleteConfirmModal, RoomDetailModal) ---
+  // ... (Inlining them for brevity as they are unchanged from the input, but ensuring they exist in the output)
   const AddRoomModal = () => {
      const [input, setInput] = useState('');
      const [photo, setPhoto] = useState<string | null>(null);
@@ -212,7 +323,6 @@ export const RoomsDashboard: React.FC<RoomsDashboardProps> = ({ menu, onUpdateMe
 
   const RoomDetailModal = () => {
      if (!selectedRoom) return null;
-     
      return (
         <div className="fixed inset-0 z-[90] bg-black/60 flex justify-end backdrop-blur-sm animate-in slide-in-from-right duration-300">
            <div className="w-full md:w-[480px] bg-white h-full shadow-2xl flex flex-col">
@@ -257,21 +367,6 @@ export const RoomsDashboard: React.FC<RoomsDashboardProps> = ({ menu, onUpdateMe
                         Delete Room
                      </Button>
                  </div>
-
-                 <div className="pt-6 border-t border-slate-100">
-                    <h4 className="font-bold text-slate-900 mb-4">Recent Activity (Mock)</h4>
-                    {[1,2,3].map(i => (
-                        <div key={i} className="flex gap-4 mb-4 opacity-70">
-                            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
-                                <Icons.Clock className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-bold text-slate-800">Status changed to {i % 2 === 0 ? 'Available' : 'Engaged'}</p>
-                                <p className="text-xs text-slate-500">Today, 10:3{i} AM</p>
-                            </div>
-                        </div>
-                    ))}
-                 </div>
               </div>
            </div>
         </div>
@@ -295,7 +390,14 @@ export const RoomsDashboard: React.FC<RoomsDashboardProps> = ({ menu, onUpdateMe
                 </div>
              </div>
 
-             {/* Stats Cards */}
+             {/* Navigation Tabs */}
+             <div className="flex bg-purple-900/50 p-1 rounded-xl">
+                 <button onClick={() => setView('ROOMS')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${view === 'ROOMS' ? 'bg-white text-purple-800' : 'text-purple-200'}`}>Rooms</button>
+                 <button onClick={() => setView('STAFF')} className={`px-4 py-2 rounded-lg font-bold text-sm transition-all ${view === 'STAFF' ? 'bg-white text-purple-800' : 'text-purple-200'}`}>Staff</button>
+             </div>
+
+             {/* Stats Cards (Only show in Rooms View) */}
+             {view === 'ROOMS' && (
              <div className="flex gap-2 md:gap-4 overflow-x-auto w-full md:w-auto no-scrollbar pb-1 md:pb-0">
                 <div className="bg-white/10 backdrop-blur rounded-xl p-3 min-w-[110px] flex flex-col items-center border border-white/10">
                    <span className="text-[10px] text-purple-200 font-bold uppercase tracking-widest">Total</span>
@@ -310,9 +412,11 @@ export const RoomsDashboard: React.FC<RoomsDashboardProps> = ({ menu, onUpdateMe
                    <span className="text-3xl font-black text-orange-300">{stats.engaged}</span>
                 </div>
              </div>
+             )}
           </div>
           
-          {/* Controls Bar */}
+          {/* Controls Bar (Only in Rooms view) */}
+          {view === 'ROOMS' && (
           <div className="bg-white px-4 py-3 shadow-sm border-b border-gray-200 flex items-center justify-between gap-4 overflow-x-auto">
              <div className="flex bg-slate-100 p-1 rounded-xl shrink-0">
                 {(['ALL', 'AVAILABLE', 'ENGAGED'] as const).map(f => (
@@ -336,79 +440,84 @@ export const RoomsDashboard: React.FC<RoomsDashboardProps> = ({ menu, onUpdateMe
                Add Room
              </Button>
           </div>
-       </div>
-
-       {/* Main Grid */}
-       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
-             {filteredRooms.map(room => (
-                <div 
-                  key={room.id} 
-                  onClick={() => setSelectedRoom(room)}
-                  className={`relative rounded-[2rem] overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 border-2 cursor-pointer group ${room.isAvailable ? 'bg-white border-transparent' : 'bg-orange-50 border-orange-200'}`}
-                >
-                   {/* Card Header */}
-                   <div className="h-48 md:h-56 relative bg-gray-200 overflow-hidden">
-                      <img 
-                        src={room.image} 
-                        className={`w-full h-full object-cover transition-all duration-700 group-hover:scale-110 ${!room.isAvailable ? 'grayscale opacity-60' : ''}`} 
-                        loading="lazy" 
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                      
-                      {/* Big Room Number Overlay */}
-                      <div className="absolute top-4 left-4">
-                          <div className="bg-white/95 backdrop-blur-md px-5 py-3 rounded-2xl shadow-xl flex flex-col items-center border border-white/50">
-                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Room</span>
-                             <h3 className="text-4xl font-black text-slate-900 tracking-tighter leading-none">{room.name}</h3>
-                          </div>
-                      </div>
-
-                      <div className={`absolute top-4 right-4 px-3 py-1.5 rounded-full font-bold text-xs uppercase shadow-lg flex items-center gap-1.5 border border-white/20 backdrop-blur-md ${room.isAvailable ? 'bg-green-500/90 text-white' : 'bg-orange-500/90 text-white'}`}>
-                         {room.isAvailable ? <Icons.CheckCircle className="w-4 h-4" /> : <Icons.Lock className="w-4 h-4" />}
-                         {room.isAvailable ? 'Available' : 'Engaged'}
-                      </div>
-                   </div>
-
-                   {/* Card Body */}
-                   <div className="p-4 md:p-5">
-                      {/* Toggle Button - Massive Touch Target */}
-                      <button 
-                        onClick={(e) => handleToggleStatus(e, room)}
-                        className={`w-full h-20 rounded-2xl flex items-center justify-between px-6 transition-all active:scale-95 shadow-lg border-b-4 ${room.isAvailable ? 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200' : 'bg-green-600 border-green-800 text-white hover:bg-green-500'}`}
-                      >
-                         <div className="flex items-center gap-3">
-                            {room.isAvailable ? <Icons.Lock className="w-8 h-8" /> : <Icons.Unlock className="w-8 h-8" />}
-                            <div className="text-left">
-                                <span className="block text-xs font-bold uppercase opacity-70">{room.isAvailable ? 'Check-In' : 'Check-Out'}</span>
-                                <span className="block text-xl font-black">{room.isAvailable ? 'Engage' : 'Vacate'}</span>
-                            </div>
-                         </div>
-                         <Icons.ArrowRight className="w-6 h-6 opacity-50" />
-                      </button>
-
-                      <div className="mt-4 flex justify-between items-center px-2">
-                         <button 
-                           onClick={(e) => { e.stopPropagation(); speak(`Room ${formatDigits(room.name)} is ${room.isAvailable ? 'Available' : 'Engaged'}`); }}
-                           className="w-12 h-12 rounded-full bg-white border-2 border-slate-100 flex items-center justify-center text-slate-400 hover:text-purple-600 hover:border-purple-200 shadow-sm active:bg-purple-50"
-                         >
-                            <Icons.Audio className="w-6 h-6" />
-                         </button>
-                         <span className="text-slate-400 font-bold text-lg">₹{room.price}</span>
-                      </div>
-                   </div>
-                </div>
-             ))}
-          </div>
-          
-          {filteredRooms.length === 0 && (
-             <div className="flex flex-col items-center justify-center py-32 text-slate-400">
-                <Icons.Grid className="w-24 h-24 mb-6 opacity-10" />
-                <h3 className="text-2xl font-black text-slate-300">No rooms found</h3>
-                <p className="text-slate-400">Try changing the filter</p>
-             </div>
           )}
        </div>
+
+       {/* Main Content */}
+       {view === 'STAFF' ? (
+           <RoomsStaffView />
+       ) : (
+           <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-6">
+                 {filteredRooms.map(room => (
+                    <div 
+                      key={room.id} 
+                      onClick={() => setSelectedRoom(room)}
+                      className={`relative rounded-[2rem] overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 border-2 cursor-pointer group ${room.isAvailable ? 'bg-white border-transparent' : 'bg-orange-50 border-orange-200'}`}
+                    >
+                       {/* Card Header */}
+                       <div className="h-48 md:h-56 relative bg-gray-200 overflow-hidden">
+                          <img 
+                            src={room.image} 
+                            className={`w-full h-full object-cover transition-all duration-700 group-hover:scale-110 ${!room.isAvailable ? 'grayscale opacity-60' : ''}`} 
+                            loading="lazy" 
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                          
+                          {/* Big Room Number Overlay */}
+                          <div className="absolute top-4 left-4">
+                              <div className="bg-white/95 backdrop-blur-md px-5 py-3 rounded-2xl shadow-xl flex flex-col items-center border border-white/50">
+                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Room</span>
+                                 <h3 className="text-4xl font-black text-slate-900 tracking-tighter leading-none">{room.name}</h3>
+                              </div>
+                          </div>
+
+                          <div className={`absolute top-4 right-4 px-3 py-1.5 rounded-full font-bold text-xs uppercase shadow-lg flex items-center gap-1.5 border border-white/20 backdrop-blur-md ${room.isAvailable ? 'bg-green-500/90 text-white' : 'bg-orange-500/90 text-white'}`}>
+                             {room.isAvailable ? <Icons.CheckCircle className="w-4 h-4" /> : <Icons.Lock className="w-4 h-4" />}
+                             {room.isAvailable ? 'Available' : 'Engaged'}
+                          </div>
+                       </div>
+
+                       {/* Card Body */}
+                       <div className="p-4 md:p-5">
+                          {/* Toggle Button - Massive Touch Target */}
+                          <button 
+                            onClick={(e) => handleToggleStatus(e, room)}
+                            className={`w-full h-20 rounded-2xl flex items-center justify-between px-6 transition-all active:scale-95 shadow-lg border-b-4 ${room.isAvailable ? 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-orange-50 hover:text-orange-600 hover:border-orange-200' : 'bg-green-600 border-green-800 text-white hover:bg-green-500'}`}
+                          >
+                             <div className="flex items-center gap-3">
+                                {room.isAvailable ? <Icons.Lock className="w-8 h-8" /> : <Icons.Unlock className="w-8 h-8" />}
+                                <div className="text-left">
+                                    <span className="block text-xs font-bold uppercase opacity-70">{room.isAvailable ? 'Check-In' : 'Check-Out'}</span>
+                                    <span className="block text-xl font-black">{room.isAvailable ? 'Engage' : 'Vacate'}</span>
+                                </div>
+                             </div>
+                             <Icons.ArrowRight className="w-6 h-6 opacity-50" />
+                          </button>
+
+                          <div className="mt-4 flex justify-between items-center px-2">
+                             <button 
+                               onClick={(e) => { e.stopPropagation(); speak(`Room ${formatDigits(room.name)} is ${room.isAvailable ? 'Available' : 'Engaged'}`); }}
+                               className="w-12 h-12 rounded-full bg-white border-2 border-slate-100 flex items-center justify-center text-slate-400 hover:text-purple-600 hover:border-purple-200 shadow-sm active:bg-purple-50"
+                             >
+                                <Icons.Audio className="w-6 h-6" />
+                             </button>
+                             <span className="text-slate-400 font-bold text-lg">₹{room.price}</span>
+                          </div>
+                       </div>
+                    </div>
+                 ))}
+              </div>
+              
+              {filteredRooms.length === 0 && (
+                 <div className="flex flex-col items-center justify-center py-32 text-slate-400">
+                    <Icons.Grid className="w-24 h-24 mb-6 opacity-10" />
+                    <h3 className="text-2xl font-black text-slate-300">No rooms found</h3>
+                    <p className="text-slate-400">Try changing the filter</p>
+                 </div>
+              )}
+           </div>
+       )}
 
        {/* Floating Undo Toast */}
        {undoState && (
