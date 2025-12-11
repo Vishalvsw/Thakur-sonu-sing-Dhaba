@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Icons } from './IconSet';
 import { Button, ProductCard, DietaryBadge } from './Components';
-import { BusinessUnit, Order, Product, CartItem, OrderStatus, PaymentMethod, UserRole } from '../types';
+import { BusinessUnit, Order, Product, CartItem, OrderStatus, PaymentMethod, UserRole, StaffMember } from '../types';
 import { COLORS, UI_TEXT } from '../constants';
 import { parseVoiceOrder } from '../services/geminiService';
 
@@ -442,6 +442,259 @@ const InventoryView: React.FC<InventoryViewProps> = ({
   );
 };
 
+// --- EXTRACTED COMPONENT: StaffView ---
+const StaffView = () => {
+  const [staff, setStaff] = useState<StaffMember[]>([
+    { id: 'S1', name: 'Rahul Kumar', role: 'Head Chef', bu: BusinessUnit.DHABA, phone: '9876543210', salary: 25000, salaryPaid: 25000, status: 'Active', attendance: 26, joinDate: '2023-01-15' },
+    { id: 'S2', name: 'Amit Singh', role: 'Waiter', bu: BusinessUnit.DHABA, phone: '9876543211', salary: 12000, salaryPaid: 0, status: 'Active', attendance: 24, joinDate: '2023-03-10' },
+  ]);
+  
+  const [showPayModal, setShowPayModal] = useState<StaffMember | null>(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newStaff, setNewStaff] = useState({ name: '', role: 'Waiter', phone: '', salary: '', dept: 'Service' });
+
+  const totalPayroll = staff.reduce((acc, s) => acc + s.salary, 0);
+  const paidAmount = staff.reduce((acc, s) => acc + s.salaryPaid, 0);
+  const pending = totalPayroll - paidAmount;
+
+  const toggleStatus = (id: string) => {
+    setStaff(prev => prev.map(s => {
+      if (s.id === id) {
+        let newStatus: any = 'Active';
+        if (s.status === 'Active') newStatus = 'On Leave';
+        else if (s.status === 'On Leave') newStatus = 'Terminated';
+        else newStatus = 'Active';
+        return { ...s, status: newStatus };
+      }
+      return s;
+    }));
+  };
+
+  const handlePay = () => {
+    if(!showPayModal || !payAmount) return;
+    const amt = parseInt(payAmount);
+    setStaff(prev => prev.map(s => s.id === showPayModal.id ? {...s, salaryPaid: s.salaryPaid + amt} : s));
+    setShowPayModal(null);
+    setPayAmount('');
+    alert(`Paid ₹${amt} to ${showPayModal.name}`);
+  };
+
+  const handleAddStaff = () => {
+    if(!newStaff.name || !newStaff.salary) return;
+    const newMember: StaffMember = {
+        id: Math.random().toString(36).substr(2,9),
+        name: newStaff.name,
+        role: newStaff.role,
+        bu: BusinessUnit.DHABA, // Default to current unit context
+        phone: newStaff.phone || '-',
+        salary: parseInt(newStaff.salary),
+        salaryPaid: 0,
+        status: 'Active',
+        attendance: 0,
+        joinDate: new Date().toISOString().split('T')[0]
+    };
+    setStaff(prev => [newMember, ...prev]);
+    setShowAddModal(false);
+    setNewStaff({ name: '', role: 'Waiter', phone: '', salary: '', dept: 'Service' });
+  };
+
+  const statusColors = {
+      'Active': 'bg-green-100 text-green-700 border-green-200',
+      'On Leave': 'bg-yellow-100 text-yellow-700 border-yellow-200',
+      'Terminated': 'bg-red-100 text-red-700 border-red-200',
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in">
+       {/* Summary Header */}
+       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
+             <div className="flex justify-between items-start mb-2">
+                <div className="p-3 bg-slate-100 rounded-xl text-slate-600"><Icons.Wallet className="w-6 h-6" /></div>
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Monthly Payroll</span>
+             </div>
+             <div>
+                <p className="text-3xl font-black text-slate-900">₹{totalPayroll.toLocaleString()}</p>
+                <p className="text-xs text-slate-500 mt-1 font-medium">Total commitments</p>
+             </div>
+          </div>
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
+             <div className="flex justify-between items-start mb-2">
+                <div className="p-3 bg-green-50 rounded-xl text-green-600"><Icons.CheckCircle className="w-6 h-6" /></div>
+                <span className="text-xs font-bold text-green-600 uppercase tracking-wider">Paid</span>
+             </div>
+             <div>
+                <p className="text-3xl font-black text-green-600">₹{paidAmount.toLocaleString()}</p>
+                <p className="text-xs text-green-700/60 mt-1 font-medium">Disbursed this month</p>
+             </div>
+          </div>
+          <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between relative overflow-hidden">
+             <div className="absolute top-0 right-0 w-24 h-24 bg-red-50 rounded-full -mr-8 -mt-8" />
+             <div className="flex justify-between items-start mb-2 relative z-10">
+                <div className="p-3 bg-red-50 rounded-xl text-red-600"><Icons.Clock className="w-6 h-6" /></div>
+                <span className="text-xs font-bold text-red-600 uppercase tracking-wider">Pending</span>
+             </div>
+             <div className="relative z-10">
+                <p className="text-3xl font-black text-red-600">₹{pending.toLocaleString()}</p>
+                <div className="flex justify-between items-center mt-2">
+                    <p className="text-xs text-red-700/60 font-medium">Remaining to pay</p>
+                    <Button size="sm" onClick={() => setShowAddModal(true)} icon={<Icons.Plus className="w-4 h-4"/>} className="h-8 text-xs bg-slate-900 hover:bg-slate-800">Add Staff</Button>
+                </div>
+             </div>
+          </div>
+       </div>
+
+       {/* Staff List */}
+       <div className="grid grid-cols-1 gap-4">
+          {staff.map(s => {
+             const percentPaid = s.salary > 0 ? Math.min((s.salaryPaid / s.salary) * 100, 100) : 0;
+             return (
+             <div key={s.id} className="bg-white p-5 rounded-2xl border border-slate-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-sm hover:shadow-md transition-shadow group">
+                {/* Profile Info */}
+                <div className="flex items-center gap-4 w-full md:w-auto min-w-[200px]">
+                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-xl text-white shadow-lg ${s.status === 'Active' ? 'bg-gradient-to-br from-orange-400 to-orange-600' : 'bg-slate-300'}`}>
+                      {s.name.charAt(0)}
+                   </div>
+                   <div>
+                      <p className="font-bold text-slate-900 text-lg leading-none mb-1">{s.name}</p>
+                      <div className="flex gap-2">
+                          <span className="inline-block bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">{s.role}</span>
+                          <span className="inline-block bg-slate-100 text-slate-600 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide">{s.bu}</span>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1">{s.phone}</p>
+                   </div>
+                </div>
+
+                {/* Salary Progress */}
+                <div className="flex-1 w-full md:px-8">
+                   <div className="flex justify-between text-xs font-bold mb-2">
+                      <span className="text-slate-500 flex items-center gap-1"><Icons.Wallet className="w-3 h-3" /> Salary Paid</span>
+                      <span className="text-slate-900">₹{s.salaryPaid.toLocaleString()} <span className="text-slate-400 font-normal">/ ₹{s.salary.toLocaleString()}</span></span>
+                   </div>
+                   <div className="h-4 w-full bg-slate-100 rounded-full overflow-hidden border border-slate-200 relative">
+                      <div className={`h-full rounded-full transition-all duration-1000 ease-out ${s.salaryPaid >= s.salary ? 'bg-green-500' : 'bg-orange-500'}`} style={{ width: `${percentPaid}%` }} />
+                      <div className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-slate-500 mix-blend-multiply">
+                          {Math.round(percentPaid)}% Paid
+                      </div>
+                   </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-3 w-full md:w-auto">
+                    <button 
+                        onClick={() => toggleStatus(s.id)}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all flex-1 md:flex-none flex items-center justify-center gap-2 ${statusColors[s.status as keyof typeof statusColors]}`}
+                    >
+                        {s.status}
+                    </button>
+                    <Button 
+                        size="sm" 
+                        bu={BusinessUnit.DHABA}
+                        disabled={s.salaryPaid >= s.salary}
+                        onClick={() => setShowPayModal(s)}
+                        className={`flex-1 md:flex-none min-w-[100px] ${s.salaryPaid >= s.salary ? 'bg-slate-100 text-slate-400 border border-slate-200' : 'bg-slate-900 text-white shadow-lg shadow-slate-200'}`}
+                    >
+                        {s.salaryPaid >= s.salary ? 'Paid Full' : 'Pay Salary'}
+                    </Button>
+                </div>
+             </div>
+          )})}
+       </div>
+
+       {/* Pay Modal */}
+       {showPayModal && (
+          <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+             <div className="bg-white p-8 rounded-[2rem] w-full max-w-sm shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-400 to-red-500" />
+                <h3 className="text-2xl font-black text-slate-900 mb-1">Process Salary</h3>
+                <p className="text-slate-500 text-sm mb-8">Paying to <span className="font-bold text-slate-900">{showPayModal.name}</span></p>
+                
+                <div className="bg-slate-50 p-4 rounded-2xl mb-6 border border-slate-100">
+                    <div className="flex justify-between text-sm mb-2">
+                        <span className="text-slate-500">Remaining Due</span>
+                        <span className="font-bold text-red-600">₹{showPayModal.salary - showPayModal.salaryPaid}</span>
+                    </div>
+                    <div className="h-px bg-slate-200 my-2" />
+                    <div className="flex gap-2">
+                        <button onClick={() => setPayAmount((showPayModal.salary - showPayModal.salaryPaid).toString())} className="bg-white border border-slate-200 text-slate-600 text-xs font-bold px-3 py-1 rounded-lg hover:border-orange-500 hover:text-orange-600 transition-colors">Pay Full</button>
+                        <button onClick={() => setPayAmount("5000")} className="bg-white border border-slate-200 text-slate-600 text-xs font-bold px-3 py-1 rounded-lg hover:border-orange-500 hover:text-orange-600 transition-colors">₹5000</button>
+                    </div>
+                </div>
+
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Enter Amount</label>
+                <div className="relative mb-8">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xl">₹</span>
+                    <input 
+                    type="number" 
+                    value={payAmount} 
+                    onChange={e => setPayAmount(e.target.value)} 
+                    placeholder="0" 
+                    className="w-full pl-10 p-4 border-2 border-slate-200 rounded-2xl text-2xl font-black text-slate-900 focus:border-orange-500 outline-none transition-colors placeholder:text-slate-300"
+                    autoFocus 
+                    />
+                </div>
+                
+                <div className="flex gap-3">
+                   <Button variant="secondary" fullWidth onClick={() => setShowPayModal(null)} className="h-14 rounded-xl">Cancel</Button>
+                   <Button fullWidth onClick={handlePay} disabled={!payAmount} className="bg-green-600 hover:bg-green-700 h-14 rounded-xl shadow-lg shadow-green-200">Confirm Payment</Button>
+                </div>
+             </div>
+          </div>
+       )}
+
+       {/* Add Staff Modal */}
+       {showAddModal && (
+          <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+             <div className="bg-white p-8 rounded-[2rem] w-full max-w-sm shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-2 bg-slate-900" />
+                <h3 className="text-2xl font-black text-slate-900 mb-6">Onboard Staff</h3>
+                <div className="space-y-4 mb-8">
+                   <div>
+                       <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Full Name</label>
+                       <input value={newStaff.name} onChange={e => setNewStaff({...newStaff, name: e.target.value})} placeholder="e.g. Amit Singh" className="w-full p-4 border border-slate-200 rounded-xl outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors" />
+                   </div>
+                   <div>
+                       <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Mobile Number</label>
+                       <input value={newStaff.phone} onChange={e => setNewStaff({...newStaff, phone: e.target.value})} placeholder="9876543210" className="w-full p-4 border border-slate-200 rounded-xl outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors" />
+                   </div>
+                   <div className="grid grid-cols-2 gap-4">
+                       <div>
+                           <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Role</label>
+                           <select value={newStaff.role} onChange={e => setNewStaff({...newStaff, role: e.target.value})} className="w-full p-4 border border-slate-200 rounded-xl bg-white outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors appearance-none">
+                              <option>Waiter</option>
+                              <option>Chef</option>
+                              <option>Cleaner</option>
+                              <option>Helper</option>
+                              <option>Manager</option>
+                           </select>
+                       </div>
+                       <div>
+                           <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Department</label>
+                           <select value={newStaff.dept} onChange={e => setNewStaff({...newStaff, dept: e.target.value})} className="w-full p-4 border border-slate-200 rounded-xl bg-white outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors appearance-none">
+                              <option>Service</option>
+                              <option>Kitchen</option>
+                              <option>Utility</option>
+                              <option>Management</option>
+                           </select>
+                       </div>
+                   </div>
+                   <div>
+                       <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1 block">Monthly Salary</label>
+                       <input type="number" value={newStaff.salary} onChange={e => setNewStaff({...newStaff, salary: e.target.value})} placeholder="₹" className="w-full p-4 border border-slate-200 rounded-xl outline-none focus:border-slate-900 font-bold text-slate-800 transition-colors" />
+                   </div>
+                </div>
+                <div className="flex gap-3">
+                   <Button variant="secondary" fullWidth onClick={() => setShowAddModal(false)} className="h-14 rounded-xl">Cancel</Button>
+                   <Button fullWidth onClick={handleAddStaff} disabled={!newStaff.name || !newStaff.salary} className="bg-slate-900 hover:bg-slate-800 h-14 rounded-xl shadow-xl">Add & Active</Button>
+                </div>
+             </div>
+          </div>
+       )}
+    </div>
+  );
+};
+
 // --- EXTRACTED COMPONENT: ManageOrdersView ---
 interface ManageOrdersViewProps {
   activeOrders: Order[];
@@ -661,14 +914,14 @@ const ManageMenuView: React.FC<ManageMenuViewProps> = ({ menu, onUpdateMenu, lan
 export const DhabaDashboard: React.FC<DhabaDashboardProps> = ({ 
   userRole, 
   activeOrders, 
-  onPlaceOrder,
+  onPlaceOrder, 
   onUpdateOrderStatus,
   menu,
   onUpdateMenu
 }) => {
   // View State
   const [view, setView] = useState<'order' | 'manage' | 'inventory'>('order');
-  const [manageSubView, setManageSubView] = useState<'orders' | 'menu'>('orders');
+  const [manageSubView, setManageSubView] = useState<'orders' | 'menu' | 'staff'>('orders');
   
   // Inventory State
   const [rawInventory, setRawInventory] = useState<InventoryItem[]>(INITIAL_RAW_INVENTORY);
@@ -1033,6 +1286,27 @@ export const DhabaDashboard: React.FC<DhabaDashboardProps> = ({
     const subtotal = cartTotal;
     const tax = Math.round(subtotal * 0.05);
     const total = subtotal + tax;
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    const handlePayment = (method: PaymentMethod) => {
+        if (method === PaymentMethod.UPI) {
+            setIsProcessing(true);
+            setTimeout(() => {
+                onPlaceOrder(cart, tableId, method);
+                setCart([]);
+                setShowCheckout(false);
+                setIsCartExpanded(false);
+                setOrderSuccess(true);
+                setIsProcessing(false);
+            }, 3000); // Simulate API delay
+        } else {
+            onPlaceOrder(cart, tableId, method);
+            setCart([]);
+            setShowCheckout(false);
+            setIsCartExpanded(false);
+            setOrderSuccess(true);
+        }
+    };
 
     return (
       <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
@@ -1051,75 +1325,83 @@ export const DhabaDashboard: React.FC<DhabaDashboardProps> = ({
               </div>
            </div>
 
-           {/* Scrollable Bill Content */}
-           <div className="p-6 overflow-y-auto flex-1 bg-gray-50">
-              {/* Order Summary Card */}
-              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm mb-6">
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-100 pb-2">Order Summary</h3>
-                  <div className="space-y-3">
-                      {cart.map((item, idx) => (
-                          <div key={idx} className="flex justify-between items-start text-sm">
-                              <div className="flex gap-3">
-                                  <span className="font-bold text-slate-700 bg-gray-100 px-2 py-0.5 rounded text-xs h-fit">x{item.quantity}</span>
-                                  <span className="text-slate-600 font-medium leading-tight max-w-[160px]">{language === 'hi' ? item.localName : item.name}</span>
-                              </div>
-                              <span className="font-bold text-slate-800">₹{item.price * item.quantity}</span>
-                          </div>
-                      ))}
+           {/* Content */}
+           <div className="p-6 overflow-y-auto flex-1 bg-gray-50 relative">
+              {isProcessing ? (
+                  <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm">
+                      <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4" />
+                      <h3 className="text-lg font-bold text-slate-800">Processing Payment...</h3>
+                      <p className="text-slate-500 text-sm">Please wait</p>
+                      
+                      {/* Fake QR for realism */}
+                      <div className="mt-6 bg-white p-4 rounded-xl border border-gray-200 shadow-lg">
+                          <Icons.QR className="w-32 h-32 text-slate-800" />
+                      </div>
+                      <p className="text-xs text-orange-600 font-bold mt-2 animate-pulse">Scanning...</p>
                   </div>
-                  
-                  {/* Dashed Separator */}
-                  <div className="my-4 border-t-2 border-dashed border-gray-100" />
-                  
-                  {/* Totals */}
-                  <div className="space-y-2">
-                      <div className="flex justify-between text-sm text-gray-500">
-                          <span>Subtotal</span>
-                          <span>₹{subtotal}</span>
-                      </div>
-                      <div className="flex justify-between text-sm text-gray-500">
-                          <span>CGST/SGST (5%)</span>
-                          <span>₹{tax}</span>
-                      </div>
-                      <div className="flex justify-between text-xl font-black text-slate-900 pt-2 mt-2 border-t border-gray-100">
-                          <span>Total</span>
-                          <span>₹{total}</span>
-                      </div>
-                  </div>
-              </div>
+              ) : (
+                  <>
+                    {/* Order Summary Card */}
+                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm mb-6">
+                        <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4 border-b border-gray-100 pb-2">Order Summary</h3>
+                        <div className="space-y-3">
+                            {cart.map((item, idx) => (
+                                <div key={idx} className="flex justify-between items-start text-sm">
+                                    <div className="flex gap-3">
+                                        <span className="font-bold text-slate-700 bg-gray-100 px-2 py-0.5 rounded text-xs h-fit">x{item.quantity}</span>
+                                        <span className="text-slate-600 font-medium leading-tight max-w-[160px]">{language === 'hi' ? item.localName : item.name}</span>
+                                    </div>
+                                    <span className="font-bold text-slate-800">₹{item.price * item.quantity}</span>
+                                </div>
+                            ))}
+                        </div>
+                        
+                        <div className="my-4 border-t-2 border-dashed border-gray-100" />
+                        
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-sm text-gray-500">
+                                <span>Subtotal</span>
+                                <span>₹{subtotal}</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-gray-500">
+                                <span>CGST/SGST (5%)</span>
+                                <span>₹{tax}</span>
+                            </div>
+                            <div className="flex justify-between text-xl font-black text-slate-900 pt-2 mt-2 border-t border-gray-100">
+                                <span>Total</span>
+                                <span>₹{total}</span>
+                            </div>
+                        </div>
+                    </div>
 
-              {/* Payment Method Selection */}
-              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Select Payment Method</h3>
-              <div className="grid grid-cols-1 gap-3">
-                 {[
-                   { label: 'Cash Payment', icon: Icons.Cash, method: PaymentMethod.CASH, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-100' },
-                   { label: 'UPI / Online', icon: Icons.Phone, method: PaymentMethod.UPI, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
-                   { label: 'Room Charge', icon: Icons.Room, method: PaymentMethod.ROOM_CHARGE, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-100' },
-                 ].map((opt) => (
-                   <button 
-                     key={opt.label}
-                     onClick={() => {
-                       onPlaceOrder(cart, tableId, opt.method);
-                       setCart([]);
-                       setShowCheckout(false);
-                       setIsCartExpanded(false);
-                       setOrderSuccess(true);
-                     }}
-                     className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all active:scale-95 group ${opt.bg} ${opt.border} hover:border-current hover:shadow-md bg-white`}
-                   >
-                     <div className={`p-3 rounded-full bg-white shadow-sm ${opt.color}`}>
-                        <opt.icon className="w-6 h-6" />
-                     </div>
-                     <div className="text-left">
-                        <span className={`block font-bold text-slate-800 text-lg group-hover:${opt.color}`}>{opt.label}</span>
-                        <span className="text-xs text-slate-500 font-medium">Tap to confirm order</span>
-                     </div>
-                     <div className="ml-auto">
-                        <Icons.ArrowRight className={`w-5 h-5 text-gray-300 group-hover:${opt.color}`} />
-                     </div>
-                   </button>
-                 ))}
-              </div>
+                    {/* Payment Method Selection */}
+                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Select Payment Method</h3>
+                    <div className="grid grid-cols-1 gap-3">
+                        {[
+                        { label: 'Cash Payment', icon: Icons.Cash, method: PaymentMethod.CASH, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-100' },
+                        { label: 'UPI / Online', icon: Icons.Phone, method: PaymentMethod.UPI, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
+                        { label: 'Room Charge', icon: Icons.Room, method: PaymentMethod.ROOM_CHARGE, color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-100' },
+                        ].map((opt) => (
+                        <button 
+                            key={opt.label}
+                            onClick={() => handlePayment(opt.method)}
+                            className={`flex items-center gap-4 p-4 rounded-xl border-2 transition-all active:scale-95 group ${opt.bg} ${opt.border} hover:border-current hover:shadow-md bg-white`}
+                        >
+                            <div className={`p-3 rounded-full bg-white shadow-sm ${opt.color}`}>
+                                <opt.icon className="w-6 h-6" />
+                            </div>
+                            <div className="text-left">
+                                <span className={`block font-bold text-slate-800 text-lg group-hover:${opt.color}`}>{opt.label}</span>
+                                <span className="text-xs text-slate-500 font-medium">Tap to confirm order</span>
+                            </div>
+                            <div className="ml-auto">
+                                <Icons.ArrowRight className={`w-5 h-5 text-gray-300 group-hover:${opt.color}`} />
+                            </div>
+                        </button>
+                        ))}
+                    </div>
+                  </>
+              )}
            </div>
         </div>
       </div>
@@ -1160,6 +1442,9 @@ export const DhabaDashboard: React.FC<DhabaDashboardProps> = ({
                  <button onClick={() => setManageSubView('menu')} className={`text-xl font-bold pb-2 border-b-4 ${manageSubView === 'menu' ? 'border-orange-500 text-slate-900' : 'border-transparent text-gray-400'}`}>
                     {t('manageMenu')}
                  </button>
+                 <button onClick={() => setManageSubView('staff')} className={`text-xl font-bold pb-2 border-b-4 ${manageSubView === 'staff' ? 'border-orange-500 text-slate-900' : 'border-transparent text-gray-400'}`}>
+                    Team & Payroll
+                 </button>
               </div>
               
               {manageSubView === 'orders' ? (
@@ -1170,12 +1455,14 @@ export const DhabaDashboard: React.FC<DhabaDashboardProps> = ({
                    onUpdateOrderStatus={onUpdateOrderStatus}
                    language={language}
                  />
-              ) : (
+              ) : manageSubView === 'menu' ? (
                  <ManageMenuView 
                     menu={menu}
                     onUpdateMenu={onUpdateMenu}
                     language={language}
                  />
+              ) : (
+                 <StaffView />
               )}
            </div>
         </div>

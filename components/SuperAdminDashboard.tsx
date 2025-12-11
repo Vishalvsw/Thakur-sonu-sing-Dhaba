@@ -1,7 +1,8 @@
+
 import React, { useState } from 'react';
 import { Icons } from './IconSet';
 import { Button } from './Components';
-import { BusinessUnit } from '../types';
+import { BusinessUnit, StaffMember } from '../types';
 
 // --- Sub Components ---
 
@@ -423,10 +424,159 @@ const LodgeTab = () => (
    </div>
 );
 
+// --- STAFF & SALARY TAB ---
+
+const INITIAL_STAFF: StaffMember[] = [
+  { id: 'S1', name: 'Rahul Kumar', role: 'Head Chef', bu: BusinessUnit.DHABA, phone: '9876543210', salary: 25000, salaryPaid: 25000, status: 'Active', attendance: 26, joinDate: '2023-01-15' },
+  { id: 'S2', name: 'Amit Singh', role: 'Waiter', bu: BusinessUnit.DHABA, phone: '9876543211', salary: 12000, salaryPaid: 0, status: 'Active', attendance: 24, joinDate: '2023-03-10' },
+  { id: 'S3', name: 'Vikram', role: 'Bartender', bu: BusinessUnit.BAR, phone: '9876543212', salary: 18000, salaryPaid: 10000, status: 'Active', attendance: 25, joinDate: '2023-02-01' },
+  { id: 'S4', name: 'Suresh', role: 'Cleaner', bu: BusinessUnit.ROOMS, phone: '9876543213', salary: 10000, salaryPaid: 0, status: 'On Leave', attendance: 12, joinDate: '2023-06-20' },
+];
+
+const StaffTab = () => {
+  const [staff, setStaff] = useState<StaffMember[]>(INITIAL_STAFF);
+  const [showPayModal, setShowPayModal] = useState<StaffMember | null>(null);
+  const [payAmount, setPayAmount] = useState('');
+
+  const totalPayroll = staff.reduce((acc, s) => acc + s.salary, 0);
+  const paidThisMonth = staff.reduce((acc, s) => acc + s.salaryPaid, 0);
+  const pending = totalPayroll - paidThisMonth;
+
+  const handlePaySalary = () => {
+    if (!showPayModal || !payAmount) return;
+    const amount = parseInt(payAmount);
+    
+    setStaff(prev => prev.map(s => 
+      s.id === showPayModal.id ? { ...s, salaryPaid: s.salaryPaid + amount } : s
+    ));
+    
+    setShowPayModal(null);
+    setPayAmount('');
+    alert(`Payment of ₹${amount} recorded for ${showPayModal.name}`);
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <KPICard title="Total Staff" value={staff.length.toString()} icon={Icons.User} colorClass="text-blue-600" />
+          <KPICard title="Total Payroll" value={`₹${totalPayroll.toLocaleString()}`} icon={Icons.Wallet} colorClass="text-slate-600" />
+          <KPICard title="Paid" value={`₹${paidThisMonth.toLocaleString()}`} icon={Icons.CheckCircle} colorClass="text-green-600" />
+          <KPICard title="Pending" value={`₹${pending.toLocaleString()}`} icon={Icons.Clock} colorClass="text-red-600" />
+       </div>
+
+       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+             <h3 className="font-bold text-slate-800 text-lg">Staff Directory & Salary</h3>
+             <Button size="sm" icon={<Icons.Plus className="w-4 h-4"/>}>Add Staff</Button>
+          </div>
+          <div className="overflow-x-auto">
+             <table className="w-full text-left">
+                <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-bold">
+                   <tr>
+                      <th className="p-4">Name</th>
+                      <th className="p-4">Role / Unit</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4">Attendance</th>
+                      <th className="p-4">Salary Status</th>
+                      <th className="p-4 text-right">Action</th>
+                   </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm">
+                   {staff.map(s => {
+                      const isPaid = s.salaryPaid >= s.salary;
+                      const progress = (s.salaryPaid / s.salary) * 100;
+                      return (
+                        <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                           <td className="p-4">
+                              <p className="font-bold text-slate-900">{s.name}</p>
+                              <p className="text-xs text-slate-500">{s.phone}</p>
+                           </td>
+                           <td className="p-4">
+                              <span className="font-medium text-slate-700">{s.role}</span>
+                              <span className="block text-[10px] uppercase font-bold text-slate-400">{s.bu}</span>
+                           </td>
+                           <td className="p-4">
+                              <span className={`px-2 py-1 rounded text-xs font-bold ${s.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                                 {s.status}
+                              </span>
+                           </td>
+                           <td className="p-4 font-mono font-bold text-slate-600">
+                              {s.attendance} / 30 Days
+                           </td>
+                           <td className="p-4">
+                              <div className="flex justify-between text-xs mb-1 font-bold">
+                                 <span>₹{s.salaryPaid}</span>
+                                 <span className="text-slate-400">of ₹{s.salary}</span>
+                              </div>
+                              <div className="w-32 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                 <div className={`h-full rounded-full ${isPaid ? 'bg-green-500' : 'bg-orange-500'}`} style={{ width: `${Math.min(progress, 100)}%` }} />
+                              </div>
+                           </td>
+                           <td className="p-4 text-right">
+                              <button 
+                                disabled={isPaid}
+                                onClick={() => setShowPayModal(s)}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isPaid ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-green-600 text-white hover:bg-green-700 shadow-sm'}`}
+                              >
+                                 {isPaid ? 'Paid' : 'Pay Salary'}
+                              </button>
+                           </td>
+                        </tr>
+                      );
+                   })}
+                </tbody>
+             </table>
+          </div>
+       </div>
+
+       {/* Pay Modal */}
+       {showPayModal && (
+          <div className="fixed inset-0 z-[100] bg-black/50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+             <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl">
+                <h3 className="text-xl font-bold mb-1">Pay Salary</h3>
+                <p className="text-slate-500 text-sm mb-6">To: <span className="font-bold text-slate-900">{showPayModal.name}</span></p>
+                
+                <div className="bg-slate-50 p-4 rounded-xl mb-4 border border-slate-100">
+                   <div className="flex justify-between text-sm mb-2">
+                      <span className="text-slate-500">Monthly Salary</span>
+                      <span className="font-bold">₹{showPayModal.salary}</span>
+                   </div>
+                   <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Already Paid</span>
+                      <span className="font-bold text-green-600">₹{showPayModal.salaryPaid}</span>
+                   </div>
+                   <div className="h-px bg-slate-200 my-3" />
+                   <div className="flex justify-between text-sm">
+                      <span className="text-slate-500">Remaining</span>
+                      <span className="font-bold text-red-600">₹{showPayModal.salary - showPayModal.salaryPaid}</span>
+                   </div>
+                </div>
+
+                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Amount to Pay</label>
+                <input 
+                  type="number" 
+                  autoFocus
+                  className="w-full p-4 text-2xl font-black border-2 border-slate-200 rounded-xl mb-6 outline-none focus:border-green-500" 
+                  placeholder="0"
+                  value={payAmount}
+                  onChange={e => setPayAmount(e.target.value)}
+                />
+
+                <div className="flex gap-3">
+                   <Button variant="secondary" fullWidth onClick={() => setShowPayModal(null)}>Cancel</Button>
+                   <Button fullWidth onClick={handlePaySalary} disabled={!payAmount}>Confirm Pay</Button>
+                </div>
+             </div>
+          </div>
+       )}
+    </div>
+  );
+};
+
 // --- MAIN COMPONENT ---
 
 export const SuperAdminDashboard = ({ onExit }: { onExit: () => void }) => {
-  const [activeTab, setActiveTab] = useState<'HOME' | 'DHABA' | 'BAR' | 'SNOOKER' | 'LODGE'>('HOME');
+  const [activeTab, setActiveTab] = useState<'HOME' | 'DHABA' | 'BAR' | 'SNOOKER' | 'LODGE' | 'STAFF'>('HOME');
 
   const tabs = [
     { id: 'HOME', label: 'Dashboard', icon: Icons.Grid },
@@ -434,6 +584,7 @@ export const SuperAdminDashboard = ({ onExit }: { onExit: () => void }) => {
     { id: 'BAR', label: 'Bar', icon: Icons.Bar },
     { id: 'SNOOKER', label: 'Snooker', icon: Icons.Snooker },
     { id: 'LODGE', label: 'Lodge', icon: Icons.Room },
+    { id: 'STAFF', label: 'Staff & Salary', icon: Icons.User },
   ];
 
   return (
@@ -482,6 +633,7 @@ export const SuperAdminDashboard = ({ onExit }: { onExit: () => void }) => {
           {activeTab === 'BAR' && <BarTab />}
           {activeTab === 'SNOOKER' && <SnookerTab />}
           {activeTab === 'LODGE' && <LodgeTab />}
+          {activeTab === 'STAFF' && <StaffTab />}
        </main>
     </div>
   );

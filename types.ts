@@ -81,6 +81,19 @@ export interface Staff {
   photoUrl?: string;
 }
 
+export interface StaffMember {
+  id: string;
+  name: string;
+  role: string; // Text description e.g. "Head Chef"
+  bu: BusinessUnit;
+  phone: string;
+  salary: number; // Monthly Salary
+  salaryPaid: number; // Amount paid this month
+  status: 'Active' | 'On Leave' | 'Terminated';
+  attendance: number; // Days present this month
+  joinDate: string;
+}
+
 export interface VoiceParseResult {
   items: { item: string; quantity: number }[];
 }

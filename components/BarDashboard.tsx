@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { Icons } from './IconSet';
 import { Button } from './Components';
-import { BusinessUnit, Order, Product, CartItem, PaymentMethod, OrderStatus } from '../types';
+import { BusinessUnit, Order, Product, CartItem, PaymentMethod, OrderStatus, StaffMember } from '../types';
 import { parseVoiceOrder } from '../services/geminiService';
 
 // --- Types specific to Bar ---
@@ -161,7 +161,7 @@ interface ShiftRecord {
 }
 
 export const BarDashboard: React.FC<BarDashboardProps> = ({ menu, orders, onPlaceOrder, onUpdateMenu }) => {
-  const [view, setView] = useState<'POS' | 'INVENTORY' | 'SETTLEMENT' | 'REPORTS' | 'MANAGE' | 'HISTORY'>('POS');
+  const [view, setView] = useState<'POS' | 'INVENTORY' | 'SETTLEMENT' | 'REPORTS' | 'MANAGE' | 'HISTORY' | 'TEAM'>('POS');
   const [activeTable, setActiveTable] = useState('Table-1');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [showPinModal, setShowPinModal] = useState<{ action: string, data?: any } | null>(null);
@@ -413,6 +413,7 @@ export const BarDashboard: React.FC<BarDashboardProps> = ({ menu, orders, onPlac
          { id: 'SETTLEMENT', icon: Icons.Cash, label: 'Close' },
          { id: 'REPORTS', icon: Icons.Chart, label: 'Stats' },
          { id: 'MANAGE', icon: Icons.Edit, label: 'Edit' },
+         { id: 'TEAM', icon: Icons.User, label: 'Team' },
          { id: 'HISTORY', icon: Icons.History, label: 'Logs' },
        ].map(item => (
          <button 
@@ -433,7 +434,7 @@ export const BarDashboard: React.FC<BarDashboardProps> = ({ menu, orders, onPlac
          { id: 'POS', icon: Icons.Grid },
          { id: 'INVENTORY', icon: Icons.Search },
          { id: 'SETTLEMENT', icon: Icons.Cash },
-         { id: 'REPORTS', icon: Icons.Chart },
+         { id: 'TEAM', icon: Icons.User },
        ].map(item => (
          <button 
            key={item.id}
@@ -446,7 +447,22 @@ export const BarDashboard: React.FC<BarDashboardProps> = ({ menu, orders, onPlac
     </div>
   );
 
-  const CartDrawer = ({ isMobile = false }) => (
+  const CartDrawer = ({ isMobile = false }) => {
+    const [isProcessing, setIsProcessing] = useState(false);
+
+    const handlePayment = (method: PaymentMethod) => {
+        if (method === PaymentMethod.UPI) {
+            setIsProcessing(true);
+            setTimeout(() => {
+                handlePlaceOrder(method);
+                setIsProcessing(false);
+            }, 3000);
+        } else {
+            handlePlaceOrder(method);
+        }
+    };
+
+    return (
     <div className={`flex flex-col h-full bg-slate-900 ${isMobile ? '' : 'border-l border-slate-800'}`}>
          {/* Cart Header */}
          <div className="p-5 border-b border-slate-800 bg-slate-950">
@@ -476,8 +492,20 @@ export const BarDashboard: React.FC<BarDashboardProps> = ({ menu, orders, onPlac
            </div>
          </div>
 
-         {/* Cart Items */}
-         <div className="flex-1 overflow-y-auto p-4 space-y-3">
+         {/* Content Area with Loading State */}
+         <div className="flex-1 overflow-y-auto p-4 space-y-3 relative">
+            {isProcessing && (
+                <div className="absolute inset-0 z-20 bg-slate-900/90 backdrop-blur flex flex-col items-center justify-center">
+                    <div className="w-16 h-16 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                    <h3 className="text-white font-bold text-lg">Verifying Payment</h3>
+                    <p className="text-slate-400 text-sm mb-6">Please wait...</p>
+                    <div className="bg-white p-4 rounded-xl">
+                        <Icons.QR className="w-32 h-32 text-slate-900" />
+                    </div>
+                    <p className="text-orange-500 font-bold text-xs mt-3 animate-pulse">Processing UPI...</p>
+                </div>
+            )}
+
             {cart.map((item, idx) => (
                <div key={`${item.id}-${idx}`} className="bg-slate-800 p-3 rounded-2xl flex gap-3 group border border-transparent hover:border-slate-700 transition-all">
                   <img src={item.image} className="w-16 h-16 rounded-xl object-cover bg-slate-900" />
@@ -519,7 +547,7 @@ export const BarDashboard: React.FC<BarDashboardProps> = ({ menu, orders, onPlac
                 <Button 
                    fullWidth 
                    disabled={cart.length === 0}
-                   onClick={() => handlePlaceOrder(PaymentMethod.CASH)}
+                   onClick={() => handlePayment(PaymentMethod.CASH)}
                    className="bg-emerald-600 hover:bg-emerald-500 h-14 text-base rounded-xl font-bold"
                    icon={<Icons.Cash className="w-5 h-5" />}
                 >
@@ -528,7 +556,7 @@ export const BarDashboard: React.FC<BarDashboardProps> = ({ menu, orders, onPlac
                 <Button 
                    fullWidth 
                    disabled={cart.length === 0}
-                   onClick={() => handlePlaceOrder(PaymentMethod.UPI)}
+                   onClick={() => handlePayment(PaymentMethod.UPI)}
                    className="bg-blue-600 hover:bg-blue-500 h-14 text-base rounded-xl font-bold"
                    icon={<Icons.Phone className="w-5 h-5" />}
                 >
@@ -537,7 +565,8 @@ export const BarDashboard: React.FC<BarDashboardProps> = ({ menu, orders, onPlac
             </div>
          </div>
     </div>
-  );
+    );
+  };
 
   const POSView = () => (
     <div className="flex flex-col md:flex-row h-full overflow-hidden bg-slate-900">
@@ -738,6 +767,177 @@ export const BarDashboard: React.FC<BarDashboardProps> = ({ menu, orders, onPlac
           </div>
       </div>
   );
+
+  const TeamView = () => {
+    const [staff, setStaff] = useState<StaffMember[]>([
+        { id: 'S3', name: 'Vikram', role: 'Bartender', bu: BusinessUnit.BAR, phone: '9876543212', salary: 18000, salaryPaid: 10000, status: 'Active', attendance: 25, joinDate: '2023-02-01' },
+    ]);
+    
+    const [showPayModal, setShowPayModal] = useState<StaffMember | null>(null);
+    const [payAmount, setPayAmount] = useState('');
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [newStaff, setNewStaff] = useState({ name: '', role: 'Bartender', phone: '', salary: '' });
+
+    const totalPayroll = staff.reduce((acc, s) => acc + s.salary, 0);
+    const paidAmount = staff.reduce((acc, s) => acc + s.salaryPaid, 0);
+
+    const toggleStatus = (id: string) => {
+        setStaff(prev => prev.map(s => {
+          if (s.id === id) {
+            const newStatus = s.status === 'Active' ? 'On Leave' : 'Active';
+            return { ...s, status: newStatus };
+          }
+          return s;
+        }));
+    };
+
+    const handlePay = () => {
+        if(!showPayModal || !payAmount) return;
+        const amt = parseInt(payAmount);
+        setStaff(prev => prev.map(s => s.id === showPayModal.id ? {...s, salaryPaid: s.salaryPaid + amt} : s));
+        setShowPayModal(null);
+        setPayAmount('');
+        alert(`Paid ₹${amt} to ${showPayModal.name}`);
+    };
+
+    const handleAddStaff = () => {
+        if(!newStaff.name || !newStaff.salary) return;
+        const newMember: StaffMember = {
+            id: Math.random().toString(36).substr(2,9),
+            name: newStaff.name,
+            role: newStaff.role,
+            bu: BusinessUnit.BAR,
+            phone: newStaff.phone || '-',
+            salary: parseInt(newStaff.salary),
+            salaryPaid: 0,
+            status: 'Active',
+            attendance: 0,
+            joinDate: new Date().toISOString().split('T')[0]
+        };
+        setStaff(prev => [newMember, ...prev]);
+        setShowAddModal(false);
+        setNewStaff({ name: '', role: 'Bartender', phone: '', salary: '' });
+    };
+
+    return (
+        <div className="p-8 h-full overflow-y-auto">
+            <h2 className="text-2xl font-black text-white mb-8">Bar Staff Management</h2>
+            
+            {/* Stats Header */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <p className="text-xs text-slate-500 font-bold uppercase">Total Payroll</p>
+                    <p className="text-2xl font-black text-white">₹{totalPayroll}</p>
+                </div>
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <p className="text-xs text-slate-500 font-bold uppercase">Paid This Month</p>
+                    <p className="text-2xl font-black text-emerald-500">₹{paidAmount}</p>
+                </div>
+                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+                    <div>
+                        <p className="text-xs text-slate-500 font-bold uppercase">Active Staff</p>
+                        <p className="text-2xl font-black text-orange-500">{staff.filter(s => s.status === 'Active').length}</p>
+                    </div>
+                    <Button size="sm" bu={BusinessUnit.BAR} onClick={() => setShowAddModal(true)} icon={<Icons.Plus className="w-4 h-4"/>}>Add Staff</Button>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+                {staff.map(s => {
+                    const percentPaid = Math.min((s.salaryPaid / s.salary) * 100, 100);
+                    return (
+                    <div key={s.id} className="bg-slate-950 p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 hover:border-slate-700 transition-all">
+                        <div className="flex items-center gap-4 w-full md:w-auto">
+                            <div className="w-12 h-12 bg-slate-800 rounded-full flex items-center justify-center font-bold text-slate-400 text-lg border border-slate-700">
+                                {s.name.charAt(0)}
+                            </div>
+                            <div>
+                                <p className="font-bold text-white text-lg">{s.name}</p>
+                                <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">{s.role} • {s.phone}</p>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 w-full md:px-8">
+                            <div className="flex justify-between text-xs font-bold mb-2">
+                                <span className="text-slate-500">Salary Paid</span>
+                                <span className="text-emerald-400">₹{s.salaryPaid} / <span className="text-slate-600">₹{s.salary}</span></span>
+                            </div>
+                            <div className="h-2 w-full bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                                <div className="h-full bg-emerald-600 rounded-full transition-all duration-500" style={{ width: `${percentPaid}%` }} />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3 w-full md:w-auto">
+                            <button 
+                                onClick={() => toggleStatus(s.id)}
+                                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex-1 md:flex-none ${s.status === 'Active' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}
+                            >
+                                {s.status}
+                            </button>
+                            <Button 
+                                size="sm" 
+                                bu={BusinessUnit.BAR}
+                                disabled={s.salaryPaid >= s.salary}
+                                onClick={() => setShowPayModal(s)}
+                                className={`flex-1 md:flex-none ${s.salaryPaid >= s.salary ? 'opacity-50' : ''}`}
+                            >
+                                {s.salaryPaid >= s.salary ? 'Paid' : 'Pay'}
+                            </Button>
+                        </div>
+                    </div>
+                )})}
+            </div>
+
+            {/* Pay Modal */}
+            {showPayModal && (
+                <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-slate-900 p-8 rounded-3xl w-full max-w-sm border border-slate-800 shadow-2xl">
+                        <h3 className="text-xl font-bold text-white mb-1">Pay Salary</h3>
+                        <p className="text-slate-500 text-sm mb-6">To <span className="font-bold text-white">{showPayModal.name}</span></p>
+                        
+                        <input 
+                            type="number" 
+                            value={payAmount} 
+                            onChange={e => setPayAmount(e.target.value)} 
+                            placeholder="Enter Amount" 
+                            className="w-full p-4 bg-slate-800 border border-slate-700 rounded-xl text-white text-xl font-bold mb-6 focus:border-orange-500 outline-none placeholder:text-slate-600"
+                            autoFocus 
+                        />
+                        
+                        <div className="flex gap-3">
+                            <Button variant="secondary" fullWidth onClick={() => setShowPayModal(null)} className="bg-slate-800 text-slate-400 border-transparent hover:bg-slate-700">Cancel</Button>
+                            <Button fullWidth onClick={handlePay} bu={BusinessUnit.BAR} disabled={!payAmount} className="bg-emerald-600 hover:bg-emerald-500 text-white">Confirm Pay</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Add Staff Modal */}
+            {showAddModal && (
+                <div className="fixed inset-0 z-[100] bg-black/80 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-slate-900 p-8 rounded-3xl w-full max-w-sm border border-slate-800 shadow-2xl">
+                        <h3 className="text-xl font-bold text-white mb-6">Add New Staff</h3>
+                        <div className="space-y-4 mb-8">
+                            <input value={newStaff.name} onChange={e => setNewStaff({...newStaff, name: e.target.value})} placeholder="Name" className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none focus:border-orange-500" />
+                            <input value={newStaff.phone} onChange={e => setNewStaff({...newStaff, phone: e.target.value})} placeholder="Phone" className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none focus:border-orange-500" />
+                            <select value={newStaff.role} onChange={e => setNewStaff({...newStaff, role: e.target.value})} className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none focus:border-orange-500">
+                                <option>Bartender</option>
+                                <option>Waiter</option>
+                                <option>Security</option>
+                                <option>Cleaner</option>
+                            </select>
+                            <input type="number" value={newStaff.salary} onChange={e => setNewStaff({...newStaff, salary: e.target.value})} placeholder="Monthly Salary (₹)" className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none focus:border-orange-500" />
+                        </div>
+                        <div className="flex gap-3">
+                            <Button variant="secondary" fullWidth onClick={() => setShowAddModal(false)} className="bg-slate-800 text-slate-400 border-transparent hover:bg-slate-700">Cancel</Button>
+                            <Button fullWidth onClick={handleAddStaff} bu={BusinessUnit.BAR} disabled={!newStaff.name || !newStaff.salary} className="bg-orange-600 hover:bg-orange-500 text-white">Add Staff</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+  };
 
   const SettlementView = () => {
      // Calculate stats from current orders
@@ -978,6 +1178,7 @@ export const BarDashboard: React.FC<BarDashboardProps> = ({ menu, orders, onPlac
          {view === 'SETTLEMENT' && <SettlementView />}
          {view === 'REPORTS' && <ReportsView />}
          {view === 'MANAGE' && <ManageView />}
+         {view === 'TEAM' && <TeamView />}
          {view === 'HISTORY' && <HistoryView />}
       </div>
       <MobileNav />
