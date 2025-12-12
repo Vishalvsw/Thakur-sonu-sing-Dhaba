@@ -451,12 +451,44 @@ const StaffView = () => {
   }
 
   const [staff, setStaff] = useState<ExtendedStaffMember[]>([
-    { id: 'S1', name: 'Rahul Kumar', role: 'Head Chef', department: 'Kitchen', bu: BusinessUnit.DHABA, phone: '9876543210', salary: 25000, salaryPaid: 25000, status: 'Active', attendance: 26, joinDate: '2023-01-15' },
-    { id: 'S2', name: 'Amit Singh', role: 'Waiter', department: 'Service', bu: BusinessUnit.DHABA, phone: '9876543211', salary: 12000, salaryPaid: 0, status: 'Active', attendance: 24, joinDate: '2023-03-10' },
+    { 
+        id: 'S1', 
+        name: 'Rahul Kumar', 
+        role: 'Head Chef', 
+        department: 'Kitchen', 
+        bu: BusinessUnit.DHABA, 
+        phone: '9876543210', 
+        salary: 25000, 
+        salaryPaid: 10000, 
+        status: 'Active', 
+        attendance: 26, 
+        joinDate: '2023-01-15',
+        paymentHistory: [
+            { id: '1', date: '2023-10-05 10:30 AM', amount: 5000, method: 'Online' },
+            { id: '2', date: '2023-10-20 02:15 PM', amount: 5000, method: 'Cash' }
+        ]
+    },
+    { 
+        id: 'S2', 
+        name: 'Amit Singh', 
+        role: 'Waiter', 
+        department: 'Service', 
+        bu: BusinessUnit.DHABA, 
+        phone: '9876543211', 
+        salary: 12000, 
+        salaryPaid: 0, 
+        status: 'Active', 
+        attendance: 24, 
+        joinDate: '2023-03-10',
+        paymentHistory: []
+    },
   ]);
   
   const [showPayModal, setShowPayModal] = useState<ExtendedStaffMember | null>(null);
+  const [historyViewStaff, setHistoryViewStaff] = useState<ExtendedStaffMember | null>(null);
   const [payAmount, setPayAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('Cash');
+  const [receipt, setReceipt] = useState<{name: string, amount: number, date: string, method: string, txnId: string} | null>(null);
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [newStaff, setNewStaff] = useState({ name: '', role: 'Waiter', phone: '', salary: '', dept: 'Service' });
@@ -489,9 +521,39 @@ const StaffView = () => {
   const handlePay = () => {
     if(!showPayModal || !payAmount) return;
     const amt = parseInt(payAmount);
-    setStaff(prev => prev.map(s => s.id === showPayModal.id ? {...s, salaryPaid: s.salaryPaid + amt} : s));
+    const txnId = `TXN-${Math.floor(100000 + Math.random() * 900000)}`;
+    
+    // Create new log entry
+    const newLog = {
+        id: Date.now().toString(),
+        date: new Date().toLocaleString(),
+        amount: amt,
+        method: paymentMethod
+    };
+
+    setStaff(prev => prev.map(s => {
+        if(s.id === showPayModal.id) {
+            return {
+                ...s,
+                salaryPaid: s.salaryPaid + amt,
+                paymentHistory: [newLog, ...(s.paymentHistory || [])]
+            };
+        }
+        return s;
+    }));
+
+    // Set Receipt Data before closing modal
+    setReceipt({
+        name: showPayModal.name,
+        amount: amt,
+        date: newLog.date,
+        method: paymentMethod,
+        txnId
+    });
+
     setShowPayModal(null);
     setPayAmount('');
+    setPaymentMethod('Cash');
     triggerSync();
   };
 
@@ -509,7 +571,8 @@ const StaffView = () => {
         salaryPaid: 0,
         status: 'Active',
         attendance: 0,
-        joinDate: new Date().toISOString().split('T')[0]
+        joinDate: new Date().toISOString().split('T')[0],
+        paymentHistory: []
     };
     
     setStaff(prev => [newMember, ...prev]);
@@ -608,22 +671,32 @@ const StaffView = () => {
                 </div>
 
                 {/* Actions */}
-                <div className="flex gap-3 w-full md:w-auto">
+                <div className="flex flex-wrap gap-2 w-full md:w-auto justify-end">
                     <button 
                         onClick={() => toggleStatus(s.id)}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all flex-1 md:flex-none flex items-center justify-center gap-2 ${statusColors[s.status] || statusColors['Active']}`}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-2 ${statusColors[s.status] || statusColors['Active']}`}
                     >
                         <div className={`w-2 h-2 rounded-full ${s.status === 'Active' ? 'bg-green-600 animate-pulse' : 'bg-slate-400'}`} />
                         {s.status}
                     </button>
+                    
+                    {/* View History Button */}
+                    <button 
+                        onClick={() => setHistoryViewStaff(s)}
+                        className="px-3 py-2 rounded-xl text-xs font-bold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-all flex items-center gap-2"
+                    >
+                        <Icons.History className="w-4 h-4" />
+                        History
+                    </button>
+
                     <Button 
                         size="sm" 
                         bu={BusinessUnit.DHABA}
                         disabled={s.salaryPaid >= s.salary}
                         onClick={() => setShowPayModal(s)}
-                        className={`flex-1 md:flex-none min-w-[100px] ${s.salaryPaid >= s.salary ? 'bg-slate-100 text-slate-400 border border-slate-200' : 'bg-slate-900 text-white shadow-lg shadow-slate-200'}`}
+                        className={`min-w-[90px] ${s.salaryPaid >= s.salary ? 'bg-slate-100 text-slate-400 border border-slate-200' : 'bg-slate-900 text-white shadow-lg shadow-slate-200'}`}
                     >
-                        {s.salaryPaid >= s.salary ? 'Paid Full' : 'Pay Salary'}
+                        {s.salaryPaid >= s.salary ? 'Paid Full' : 'Pay'}
                     </Button>
                 </div>
              </div>
@@ -636,7 +709,7 @@ const StaffView = () => {
              <div className="bg-white p-8 rounded-[2rem] w-full max-w-sm shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-400 to-red-500" />
                 <h3 className="text-2xl font-black text-slate-900 mb-1">Process Salary</h3>
-                <p className="text-slate-500 text-sm mb-8">Paying to <span className="font-bold text-slate-900">{showPayModal.name}</span></p>
+                <p className="text-slate-500 text-sm mb-6">Paying to <span className="font-bold text-slate-900">{showPayModal.name}</span></p>
                 
                 <div className="bg-slate-50 p-4 rounded-2xl mb-6 border border-slate-100">
                     <div className="flex justify-between text-sm mb-2">
@@ -647,6 +720,21 @@ const StaffView = () => {
                     <div className="flex gap-2">
                         <button onClick={() => setPayAmount((showPayModal.salary - showPayModal.salaryPaid).toString())} className="bg-white border border-slate-200 text-slate-600 text-xs font-bold px-3 py-1 rounded-lg hover:border-orange-500 hover:text-orange-600 transition-colors">Pay Full</button>
                         <button onClick={() => setPayAmount("5000")} className="bg-white border border-slate-200 text-slate-600 text-xs font-bold px-3 py-1 rounded-lg hover:border-orange-500 hover:text-orange-600 transition-colors">₹5000</button>
+                    </div>
+                </div>
+
+                <div className="mb-4">
+                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2 ml-1">Payment Method</label>
+                    <div className="flex bg-slate-100 p-1 rounded-xl">
+                        {['Cash', 'Online', 'Check'].map(m => (
+                            <button
+                                key={m}
+                                onClick={() => setPaymentMethod(m)}
+                                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${paymentMethod === m ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                                {m}
+                            </button>
+                        ))}
                     </div>
                 </div>
 
@@ -669,6 +757,104 @@ const StaffView = () => {
                 </div>
              </div>
           </div>
+       )}
+
+       {/* Receipt Modal */}
+       {receipt && (
+          <div className="fixed inset-0 z-[120] bg-black/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
+            <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+              <div className="bg-green-600 p-8 text-center text-white relative overflow-hidden">
+                 <div className="absolute top-0 left-0 w-full h-full bg-white/10" style={{backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.2) 2px, transparent 2px)', backgroundSize: '16px 16px'}}></div>
+                 <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg animate-bounce-slow relative z-10">
+                    <Icons.Check className="w-10 h-10 text-green-600 stroke-[3]" />
+                 </div>
+                 <h3 className="text-2xl font-black mb-1 relative z-10">Payment Successful</h3>
+                 <p className="text-green-100 text-sm font-medium relative z-10">Transaction Completed</p>
+              </div>
+              
+              <div className="p-8">
+                 <p className="text-center text-slate-600 text-sm mb-8 leading-relaxed">
+                    Salary of <span className="font-bold text-slate-900">₹{receipt.amount.toLocaleString()}</span> for <span className="font-bold text-slate-900">{receipt.name}</span> has been processed. 
+                    <br/><br/>
+                    <span className="bg-orange-50 text-orange-700 px-2 py-1 rounded border border-orange-100 font-bold text-xs">
+                       Funds will be credited within banking hours (24-48 hrs).
+                    </span>
+                 </p>
+
+                 <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 mb-6 relative">
+                    <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full border-r border-slate-100"></div>
+                    <div className="absolute -right-2 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full border-l border-slate-100"></div>
+                    
+                    <div className="space-y-3 text-sm">
+                        <div className="flex justify-between">
+                            <span className="text-slate-500 font-medium">Ref ID</span>
+                            <span className="font-mono font-bold text-slate-700">{receipt.txnId}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-slate-500 font-medium">Date</span>
+                            <span className="font-bold text-slate-900">{receipt.date.split(',')[0]}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-slate-500 font-medium">Method</span>
+                            <span className="font-bold text-slate-900">{receipt.method}</span>
+                        </div>
+                        <div className="border-t border-dashed border-slate-200 my-2"></div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-slate-500 font-bold uppercase text-xs">Amount Paid</span>
+                            <span className="font-black text-2xl text-green-600">₹{receipt.amount.toLocaleString()}</span>
+                        </div>
+                    </div>
+                 </div>
+
+                 <Button fullWidth onClick={() => setReceipt(null)} className="bg-slate-900 shadow-xl shadow-slate-200 h-14 rounded-xl text-lg">
+                    Download Receipt
+                 </Button>
+              </div>
+            </div>
+          </div>
+       )}
+
+       {/* History Modal */}
+       {historyViewStaff && (
+           <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in">
+               <div className="bg-white w-full max-w-md rounded-[2rem] overflow-hidden shadow-2xl flex flex-col max-h-[80vh]">
+                   <div className="bg-slate-900 p-6 text-white shrink-0">
+                       <div className="flex justify-between items-start">
+                           <div>
+                               <h3 className="text-xl font-bold">Salary History</h3>
+                               <p className="text-slate-400 text-sm mt-1">{historyViewStaff.name}</p>
+                           </div>
+                           <button onClick={() => setHistoryViewStaff(null)} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition-colors"><Icons.Close /></button>
+                       </div>
+                   </div>
+                   
+                   <div className="p-6 overflow-y-auto flex-1 bg-gray-50">
+                       {(!historyViewStaff.paymentHistory || historyViewStaff.paymentHistory.length === 0) ? (
+                           <div className="text-center py-10 text-gray-400">
+                               <Icons.History className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                               <p>No payment records found.</p>
+                           </div>
+                       ) : (
+                           <div className="space-y-4">
+                               {historyViewStaff.paymentHistory.map((record) => (
+                                   <div key={record.id} className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm flex justify-between items-center">
+                                       <div>
+                                           <p className="font-bold text-slate-800 text-lg">₹{record.amount.toLocaleString()}</p>
+                                           <div className="flex items-center gap-2 mt-1">
+                                               <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded uppercase tracking-wide">{record.method}</span>
+                                               <span className="text-xs text-slate-400">{record.date}</span>
+                                           </div>
+                                       </div>
+                                       <div className="bg-green-50 p-2 rounded-full text-green-600">
+                                           <Icons.Check className="w-5 h-5" />
+                                       </div>
+                                   </div>
+                               ))}
+                           </div>
+                       )}
+                   </div>
+               </div>
+           </div>
        )}
 
        {/* Add Staff Modal */}
@@ -723,6 +909,7 @@ const StaffView = () => {
   );
 };
 
+// ... (Rest of file unchanged)
 // --- EXTRACTED COMPONENT: ManageOrdersView ---
 interface ManageOrdersViewProps {
   activeOrders: Order[];

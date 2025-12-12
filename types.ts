@@ -92,6 +92,12 @@ export interface StaffMember {
   status: 'Active' | 'On Leave' | 'Terminated';
   attendance: number; // Days present this month
   joinDate: string;
+  paymentHistory?: {
+    id: string;
+    date: string;
+    amount: number;
+    method: string;
+  }[];
 }
 
 export interface VoiceParseResult {

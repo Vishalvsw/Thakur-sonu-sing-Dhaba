@@ -437,6 +437,7 @@ const StaffTab = () => {
   const [staff, setStaff] = useState<StaffMember[]>(INITIAL_STAFF);
   const [showPayModal, setShowPayModal] = useState<StaffMember | null>(null);
   const [payAmount, setPayAmount] = useState('');
+  const [receipt, setReceipt] = useState<{name: string, amount: number, date: string, method: string, txnId: string} | null>(null);
   
   // Add Staff State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -449,14 +450,23 @@ const StaffTab = () => {
   const handlePaySalary = () => {
     if (!showPayModal || !payAmount) return;
     const amount = parseInt(payAmount);
-    
+    const txnId = `TXN-${Math.floor(100000 + Math.random() * 900000)}`;
+    const date = new Date().toLocaleString();
+
     setStaff(prev => prev.map(s => 
       s.id === showPayModal.id ? { ...s, salaryPaid: s.salaryPaid + amount } : s
     ));
     
+    setReceipt({
+      name: showPayModal.name,
+      amount,
+      date,
+      method: 'Cash', // Defaulting for simplicity in super admin view
+      txnId
+    });
+
     setShowPayModal(null);
     setPayAmount('');
-    alert(`Payment of ₹${amount} recorded for ${showPayModal.name}`);
   };
 
   const handleAddStaff = () => {
@@ -590,6 +600,61 @@ const StaffTab = () => {
                    <Button fullWidth onClick={handlePaySalary} disabled={!payAmount}>Confirm Pay</Button>
                 </div>
              </div>
+          </div>
+       )}
+
+       {/* Receipt Modal */}
+       {receipt && (
+          <div className="fixed inset-0 z-[120] bg-black/80 flex items-center justify-center p-4 backdrop-blur-md animate-in fade-in">
+            <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+              <div className="bg-green-600 p-8 text-center text-white relative overflow-hidden">
+                 <div className="absolute top-0 left-0 w-full h-full bg-white/10" style={{backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.2) 2px, transparent 2px)', backgroundSize: '16px 16px'}}></div>
+                 <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg animate-bounce-slow relative z-10">
+                    <Icons.Check className="w-10 h-10 text-green-600 stroke-[3]" />
+                 </div>
+                 <h3 className="text-2xl font-black mb-1 relative z-10">Payment Successful</h3>
+                 <p className="text-green-100 text-sm font-medium relative z-10">Transaction Completed</p>
+              </div>
+              
+              <div className="p-8">
+                 <p className="text-center text-slate-600 text-sm mb-8 leading-relaxed">
+                    Salary of <span className="font-bold text-slate-900">₹{receipt.amount.toLocaleString()}</span> for <span className="font-bold text-slate-900">{receipt.name}</span> has been processed. 
+                    <br/><br/>
+                    <span className="bg-orange-50 text-orange-700 px-2 py-1 rounded border border-orange-100 font-bold text-xs">
+                       Funds will be credited within banking hours (24-48 hrs).
+                    </span>
+                 </p>
+
+                 <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 mb-6 relative">
+                    <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full border-r border-slate-100"></div>
+                    <div className="absolute -right-2 top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full border-l border-slate-100"></div>
+                    
+                    <div className="space-y-3 text-sm">
+                        <div className="flex justify-between">
+                            <span className="text-slate-500 font-medium">Ref ID</span>
+                            <span className="font-mono font-bold text-slate-700">{receipt.txnId}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-slate-500 font-medium">Date</span>
+                            <span className="font-bold text-slate-900">{receipt.date.split(',')[0]}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-slate-500 font-medium">Method</span>
+                            <span className="font-bold text-slate-900">{receipt.method}</span>
+                        </div>
+                        <div className="border-t border-dashed border-slate-200 my-2"></div>
+                        <div className="flex justify-between items-center">
+                            <span className="text-slate-500 font-bold uppercase text-xs">Amount Paid</span>
+                            <span className="font-black text-2xl text-green-600">₹{receipt.amount.toLocaleString()}</span>
+                        </div>
+                    </div>
+                 </div>
+
+                 <Button fullWidth onClick={() => setReceipt(null)} className="bg-slate-900 shadow-xl shadow-slate-200 h-14 rounded-xl text-lg">
+                    Download Receipt
+                 </Button>
+              </div>
+            </div>
           </div>
        )}
 

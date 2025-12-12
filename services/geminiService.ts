@@ -1,12 +1,33 @@
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { Product } from "../types";
 
 // Initialize Gemini
 // NOTE: In a production app, these calls should be proxied through a backend to protect the API Key.
-// For this demo, we assume the environment variable is set in the build.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// For deployment compatibility, we check both Vite's import.meta.env and standard process.env
+const getApiKey = () => {
+  // @ts-ignore
+  if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_KEY) {
+    // @ts-ignore
+    return import.meta.env.VITE_API_KEY;
+  }
+  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+    return process.env.API_KEY;
+  }
+  // If no key is found, return undefined. The SDK might throw if used, but won't crash app start.
+  return undefined;
+};
+
+const apiKey = getApiKey();
+// Only initialize if key exists, otherwise let it fail gracefully inside the function
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
 export const parseVoiceOrder = async (transcript: string, menu: Product[]): Promise<{ id: string, quantity: number }[]> => {
+  if (!ai) {
+    console.error("Gemini API Key is missing. Please set VITE_API_KEY or API_KEY in your environment variables.");
+    return [];
+  }
+
   const model = "gemini-2.5-flash";
   
   // Create context from the passed menu (dynamic), allowing recognition of new items
